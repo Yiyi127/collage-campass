@@ -71,14 +71,29 @@ def climate_score(state: str, state_set: set) -> float:
 
 
 def geography_fit(home_state, school_state, geo_stated, geo_importance, geo_direction,
-                   climate_stated, climate_importance, is_ocean_related):
+                   climate_stated, climate_importance, climate_preference, is_ocean_related):
+    """Score geographic fit from the distance and climate sub-signals.
+
+    `climate_preference` is the student's stated "warm"/"cold" (or None). A
+    "cold" preference inverts the warm-states sub-score, so a cold state scores
+    higher than a warm one — previously every stated climate preference was
+    scored as though warm had been asked for.
+
+    Note: when the major is ocean-related the climate criterion becomes
+    "coastal", which is a requirement of the *major*, not a temperature
+    preference — so it is never inverted. Scoring inland states higher for a
+    marine-biology student who also likes cold weather would be plainly wrong.
+    """
     scores = []
     if (geo_stated and geo_importance != "not_mentioned"
             and home_state in STATE_CENTROIDS and school_state in STATE_CENTROIDS):
         scores.append(distance_score(haversine_miles(home_state, school_state), geo_direction or "near"))
     if climate_stated and climate_importance != "not_mentioned":
-        state_set = COASTAL_STATES if is_ocean_related else WARM_STATES
-        scores.append(climate_score(school_state, state_set))
+        if is_ocean_related:
+            scores.append(climate_score(school_state, COASTAL_STATES))
+        else:
+            warm = climate_score(school_state, WARM_STATES)
+            scores.append(1.0 - warm if climate_preference == "cold" else warm)
     if not scores:
         return 0.0, False
     return sum(scores) / len(scores), True

@@ -44,7 +44,8 @@ def score_one_school(conn, school, profile, national_medians):
     geo_score, geo_active = geography_fit(
         profile["location"]["home_state"], school["state"],
         geo["stated"], geo["importance"], geo.get("direction"),
-        climate["stated"], climate["importance"], _is_ocean_related(interests),
+        climate["stated"], climate["importance"], climate.get("preference"),
+        _is_ocean_related(interests),
     )
     net_price_by_income = {
         "0-30000": school["net_price_income_0_30000"],
