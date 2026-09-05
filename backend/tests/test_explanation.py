@@ -1,6 +1,6 @@
 # backend/tests/test_explanation.py
 from unittest.mock import MagicMock
-from app.llm.explanation import generate_explanations
+from app.llm.explanation import generate_explanations, _template_rationale
 from app.schemas import StudentProfile
 
 PROFILE = StudentProfile.model_validate({
@@ -12,6 +12,15 @@ COLLEGES = [
     {"school": {"unit_id": 1, "name": "Drexel University", "state": "PA"},
      "bucket": "Target", "confidence": "high", "total_preference_score": 80.0,
      "is_dream_school": False, "program_match_type": "exact", "affordability_basis": None},
+]
+
+COLLEGES_TWO = [
+    {"school": {"unit_id": 1, "name": "Drexel University", "state": "PA"},
+     "bucket": "Target", "confidence": "high", "total_preference_score": 80.0,
+     "is_dream_school": False, "program_match_type": "exact", "affordability_basis": None},
+    {"school": {"unit_id": 2, "name": "Penn State University", "state": "PA"},
+     "bucket": "Likely", "confidence": "high", "total_preference_score": 70.0,
+     "is_dream_school": False, "program_match_type": "related", "affordability_basis": None},
 ]
 
 
@@ -45,3 +54,31 @@ def test_generate_explanations_falls_back_to_template_for_missing_or_malformed_o
 
     assert summary  # non-empty fallback summary
     assert "Drexel University" in rationales[1]  # templated fallback mentions the school by name
+
+
+def test_generate_explanations_drops_hallucinated_unit_id_not_in_locked_list():
+    client = MagicMock()
+    client.messages.create.return_value = _mock_text_response(
+        '{"summary": "A solid list.", '
+        '"rationales": {"1": "Drexel is a strong practical fit.", '
+        '"999": "This school does not exist in the locked list."}}'
+    )
+
+    summary, rationales = generate_explanations(client, PROFILE, COLLEGES)
+
+    assert summary == "A solid list."
+    assert rationales == {1: "Drexel is a strong practical fit."}
+    assert 999 not in rationales
+
+
+def test_generate_explanations_backfills_only_the_missing_school_not_the_covered_one():
+    client = MagicMock()
+    client.messages.create.return_value = _mock_text_response(
+        '{"summary": "A balanced list.", '
+        '"rationales": {"1": "Drexel'"'"'s co-op program fits your practical, hands-on interests."}}'
+    )
+
+    summary, rationales = generate_explanations(client, PROFILE, COLLEGES_TWO)
+
+    assert rationales[1] == "Drexel's co-op program fits your practical, hands-on interests."
+    assert rationales[2] == _template_rationale(COLLEGES_TWO[1])
