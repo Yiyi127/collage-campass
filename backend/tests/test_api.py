@@ -164,3 +164,4 @@ def test_generate_pdf_returns_pdf_bytes():
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
     assert response.content[:4] == b"%PDF"
+

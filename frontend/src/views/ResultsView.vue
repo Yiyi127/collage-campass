@@ -32,6 +32,17 @@ async function handleDownload() {
     <div class="cards">
       <SchoolCard v-for="college in result.colleges" :key="college.name" :college="college" />
     </div>
+    <section v-if="result.dream_school_exceptions.length" class="exceptions">
+      <h2 class="exceptions-title">Dream Schools — Noted Exceptions</h2>
+      <div
+        v-for="exception in result.dream_school_exceptions"
+        :key="exception.name + exception.reason"
+        class="exception"
+      >
+        <p class="exception-name">{{ exception.name }}</p>
+        <p class="exception-reason">{{ exception.reason }}</p>
+      </div>
+    </section>
     <p v-for="note in result.relaxation_notes" :key="note" class="note">{{ note }}</p>
     <button class="seal-button" @click="handleDownload">Download PDF</button>
     <p v-if="downloadError" class="status error">{{ downloadError }}</p>
@@ -49,6 +60,36 @@ async function handleDownload() {
   font-style: italic;
   text-align: center;
   margin: 1rem 0 2rem;
+}
+.exceptions {
+  margin: 2rem 0 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--gold-leaf);
+  border-radius: 6px;
+  background: rgba(184, 134, 46, 0.07);
+}
+.exceptions-title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+  color: var(--ink-navy);
+}
+.exception + .exception {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(27, 42, 74, 0.2);
+}
+.exception-name {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+}
+.exception-reason {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  margin: 0.25rem 0 0;
 }
 .note {
   font-family: var(--font-data);

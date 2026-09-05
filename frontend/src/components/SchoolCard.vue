@@ -7,9 +7,13 @@ defineProps<{ college: CollegeEntry }>()
 <template>
   <div class="school-card">
     <div class="header">
-      <span class="name">{{ college.name }}</span>
+      <span class="name">
+        <span v-if="college.is_dream_school" class="dream-star" aria-hidden="true">★</span>
+        {{ college.name }}
+      </span>
       <span class="badge" :class="college.bucket.toLowerCase()">{{ college.bucket }}</span>
     </div>
+    <p v-if="college.is_dream_school" class="dream-label">Dream School</p>
     <p class="stats">
       {{ college.state }}
       <span v-if="college.admission_rate !== null">
@@ -17,6 +21,9 @@ defineProps<{ college: CollegeEntry }>()
       </span>
       <span v-if="college.net_price !== null">
         · ${{ Math.round(college.net_price).toLocaleString() }}/yr net price
+      </span>
+      <span v-if="college.confidence === 'low'" class="confidence-note">
+        · (data limited)
       </span>
     </p>
     <p class="rationale">{{ college.rationale }}</p>
@@ -51,10 +58,25 @@ defineProps<{ college: CollegeEntry }>()
 .badge.reach { background: var(--reach-ember); }
 .badge.target { background: var(--target-sage); }
 .badge.likely { background: var(--likely-teal); }
+.dream-star {
+  color: var(--gold-leaf);
+}
+.dream-label {
+  font-family: var(--font-data);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-leaf);
+  margin: 0.2rem 0 0;
+}
 .stats {
   font-family: var(--font-data);
   font-size: 0.85rem;
   margin: 0.4rem 0;
+}
+.confidence-note {
+  font-style: italic;
+  opacity: 0.7;
 }
 .rationale {
   font-family: var(--font-body);
