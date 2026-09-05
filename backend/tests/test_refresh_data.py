@@ -6,7 +6,7 @@ import httpx
 import pytest
 from scripts.refresh_data import (
     build_database, institution_fields_string, fetch_institutions,
-    extract_field_of_study_records, _PROGRAM_PERCENTAGE_TO_CIP2,
+    extract_field_of_study_records, _PROGRAM_PERCENTAGE_TO_CIP2, _normalize_url,
 )
 
 SAMPLE_INSTITUTIONS = [
@@ -21,6 +21,7 @@ SAMPLE_INSTITUTIONS = [
         "latest.student.size": 8000,
         "latest.cost.avg_net_price.overall": 15000,
         "latest.academics.program_percentage.computer": 0.12,
+        "school.school_url": "www.teststate.edu",
     }
 ]
 SAMPLE_FIELD_OF_STUDY = [
@@ -42,6 +43,9 @@ def test_build_database_creates_expected_tables_and_rows():
             "sat_p25, sat_p75, enrollment, net_price_overall FROM schools WHERE unit_id = 100001"
         ).fetchone()
         assert row == (100001, "Test State University", "PA", 1, 1, 0.55, 1000, 1240, 8000, 15000.0)
+
+        url_row = conn.execute("SELECT url FROM schools WHERE unit_id = 100001").fetchone()
+        assert url_row == ("https://www.teststate.edu",)
 
         cip_row = conn.execute(
             "SELECT cip_2digit, percentage FROM cip2_percentages WHERE unit_id = 100001"
@@ -74,6 +78,23 @@ def test_institution_fields_string_requests_program_percentage_keys():
     # Every suffix the parser knows how to map must be requested.
     for suffix in _PROGRAM_PERCENTAGE_TO_CIP2:
         assert f"latest.academics.program_percentage.{suffix}" in program_keys
+
+
+def test_institution_fields_string_requests_school_url():
+    assert "school.school_url" in institution_fields_string().split(",")
+
+
+def test_normalize_url_adds_a_scheme_when_missing():
+    assert _normalize_url("www.drexel.edu") == "https://www.drexel.edu"
+
+
+def test_normalize_url_leaves_an_existing_scheme_alone():
+    assert _normalize_url("http://drexel.edu") == "http://drexel.edu"
+
+
+def test_normalize_url_returns_none_for_missing_url():
+    assert _normalize_url(None) is None
+    assert _normalize_url("") is None
 
 
 def test_institution_fields_string_requests_net_price_income_brackets():

@@ -14,6 +14,7 @@ export interface CollegeEntry {
   rationale: string
   match_score: number
   distance_miles: number | null
+  url: string | null
 }
 
 export interface GenerateListResponse {

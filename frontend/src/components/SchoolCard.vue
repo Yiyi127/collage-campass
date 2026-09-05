@@ -1,16 +1,27 @@
 <!-- frontend/src/components/SchoolCard.vue -->
 <script setup lang="ts">
 import type { CollegeEntry } from '../api'
-defineProps<{ college: CollegeEntry; index: number }>()
+withDefaults(defineProps<{ college: CollegeEntry; index: number; highlighted?: boolean }>(), {
+  highlighted: false,
+})
 </script>
 
 <template>
-  <div class="school-card">
+  <div class="school-card" :class="{ highlighted }">
     <div class="header">
       <span class="name">
         <span class="index">{{ index }}.</span>
         <span v-if="college.is_dream_school" class="dream-star" aria-hidden="true">★</span>
-        {{ college.name }}
+        <a
+          v-if="college.url"
+          :href="college.url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="name-link"
+        >
+          {{ college.name }}
+        </a>
+        <span v-else>{{ college.name }}</span>
       </span>
       <span class="badge" :class="college.bucket.toLowerCase()">{{ college.bucket }}</span>
     </div>
@@ -42,6 +53,11 @@ defineProps<{ college: CollegeEntry; index: number }>()
   padding: 1rem;
   margin-bottom: 0.75rem;
   background: rgba(255, 255, 255, 0.25);
+  transition: background-color 0.4s ease, border-color 0.4s ease;
+}
+.school-card.highlighted {
+  background: rgba(184, 134, 46, 0.18);
+  border-color: var(--gold-leaf);
 }
 .header {
   display: flex;
@@ -64,6 +80,15 @@ defineProps<{ college: CollegeEntry; index: number }>()
 .badge.target { background: var(--target-sage); }
 .badge.likely { background: var(--likely-teal); }
 .dream-star {
+  color: var(--gold-leaf);
+}
+.name-link {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px dotted var(--ink-navy);
+}
+.name-link:hover {
+  border-bottom-style: solid;
   color: var(--gold-leaf);
 }
 .index {

@@ -117,6 +117,7 @@ def generate_list(request: GenerateListRequest):
             rationale=rationales.get(c["school"]["unit_id"], ""),
             match_score=round(c["total_preference_score"] * 100),
             distance_miles=round(c["distance_miles"]) if c["distance_miles"] is not None else None,
+            url=c["school"].get("url"),
         )
         for c in result["colleges"]
     ]

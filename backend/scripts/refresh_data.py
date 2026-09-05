@@ -12,7 +12,8 @@ CREATE TABLE schools (
     net_price_overall REAL,
     net_price_income_0_30000 REAL, net_price_income_30001_48000 REAL,
     net_price_income_48001_75000 REAL, net_price_income_75001_110000 REAL,
-    net_price_income_110001_plus REAL
+    net_price_income_110001_plus REAL,
+    url TEXT
 );
 CREATE TABLE cip2_percentages (unit_id INTEGER, cip_2digit TEXT, percentage REAL);
 CREATE TABLE field_of_study (
@@ -39,7 +40,7 @@ def build_database(institution_records, field_of_study_records, db_path, scoreca
         sat_p75 = _sum_or_none(rec.get("latest.admissions.sat_scores.75th_percentile.critical_reading"),
                                 rec.get("latest.admissions.sat_scores.75th_percentile.math"))
         conn.execute(
-            "INSERT INTO schools VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO schools VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 rec["id"], rec["school.name"], rec["school.state"],
                 int(rec.get("school.operating", 1)),
@@ -58,6 +59,7 @@ def build_database(institution_records, field_of_study_records, db_path, scoreca
                                 rec.get("latest.cost.net_price.private.by_income_level.75001-110000")),
                 _first_not_none(rec.get("latest.cost.net_price.public.by_income_level.110001-plus"),
                                 rec.get("latest.cost.net_price.private.by_income_level.110001-plus")),
+                _normalize_url(rec.get("school.school_url")),
             ),
         )
         for key, value in rec.items():
@@ -99,6 +101,14 @@ def _first_not_none(*values):
         if v is not None:
             return v
     return None
+
+
+def _normalize_url(raw_url: str | None) -> str | None:
+    """Scorecard's school.school_url is usually a bare domain
+    ("www.drexel.edu") with no scheme -- unusable as an <a href> as-is."""
+    if not raw_url:
+        return None
+    return raw_url if raw_url.startswith(("http://", "https://")) else f"https://{raw_url}"
 
 
 # College Scorecard's institution-level `latest.academics.program_percentage.*`
@@ -173,6 +183,7 @@ _BASE_INSTITUTION_FIELDS = (
     "latest.admissions.sat_scores.75th_percentile.math",
     "latest.student.size",
     "latest.cost.avg_net_price.overall",
+    "school.school_url",
     # Field-of-study data is NOT a separate endpoint (an earlier version of this
     # script assumed `/schools/fieldofstudy` existed -- it returns 404). It is
     # nested per-institution on the main /schools endpoint instead, as a full

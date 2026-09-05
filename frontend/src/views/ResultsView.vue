@@ -18,6 +18,31 @@ const chartColleges = numbered.map(({ college, index }) => ({
   name: college.name,
   bucket: college.bucket,
 }))
+const chartDetails = Object.fromEntries(
+  numbered.map(({ college, index }) => [
+    index,
+    {
+      name: college.name,
+      bucket: college.bucket,
+      matchScore: college.match_score,
+      admissionRate: college.admission_rate,
+      netPrice: college.net_price,
+      distanceMiles: college.distance_miles,
+    },
+  ]),
+)
+
+const highlightedIndex = ref<number | null>(null)
+let highlightTimeout: ReturnType<typeof setTimeout> | undefined
+
+function scrollToSchool(index: number) {
+  document.getElementById(`school-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  highlightedIndex.value = index
+  clearTimeout(highlightTimeout)
+  highlightTimeout = setTimeout(() => {
+    highlightedIndex.value = null
+  }, 1600)
+}
 
 type SortKey = 'match_score' | 'net_price' | 'distance_miles' | 'admission_rate'
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
@@ -70,7 +95,12 @@ async function handleDownload() {
   <div class="results-view">
     <p class="original-label">Original request</p>
     <p class="original-description">“{{ result.original_description }}”</p>
-    <StarChart :colleges="chartColleges" :student-name="studentName" />
+    <StarChart
+      :colleges="chartColleges"
+      :details="chartDetails"
+      :student-name="studentName"
+      @select="scrollToSchool"
+    />
     <p class="summary">{{ result.student_summary }}</p>
     <section class="legend">
       <p class="legend-title">What Reach / Target / Likely mean</p>
@@ -91,9 +121,11 @@ async function handleDownload() {
       <div class="cards">
         <SchoolCard
           v-for="{ college, index } in section.items"
+          :id="`school-${index}`"
           :key="college.name"
           :college="college"
           :index="index"
+          :highlighted="highlightedIndex === index"
         />
       </div>
     </section>
