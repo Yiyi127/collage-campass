@@ -19,6 +19,8 @@ CREATE TABLE field_of_study (
     graduates INTEGER, median_earnings REAL, median_debt REAL
 );
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
+CREATE INDEX idx_field_of_study_unit_id ON field_of_study(unit_id);
+CREATE INDEX idx_cip2_percentages_unit_id ON cip2_percentages(unit_id);
 """
 
 CREDENTIAL_LEVEL_NAMES = {1: "certificate", 2: "associate", 3: "bachelors", 5: "masters", 6: "doctoral"}

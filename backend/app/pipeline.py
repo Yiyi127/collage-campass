@@ -11,7 +11,7 @@ OCEAN_KEYWORDS = ("marine", "ocean", "oceanograph", "fisher")
 
 
 def _is_ocean_related(interests: dict) -> bool:
-    return any(k in interests.get("raw_text", "").lower() for k in OCEAN_KEYWORDS)
+    return any(k in (interests.get("raw_text") or "").lower() for k in OCEAN_KEYWORDS)
 
 
 def _required_state(profile) -> str | None:

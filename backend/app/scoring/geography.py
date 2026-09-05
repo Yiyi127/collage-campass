@@ -73,7 +73,8 @@ def climate_score(state: str, state_set: set) -> float:
 def geography_fit(home_state, school_state, geo_stated, geo_importance, geo_direction,
                    climate_stated, climate_importance, is_ocean_related):
     scores = []
-    if geo_stated and geo_importance != "not_mentioned":
+    if (geo_stated and geo_importance != "not_mentioned"
+            and home_state in STATE_CENTROIDS and school_state in STATE_CENTROIDS):
         scores.append(distance_score(haversine_miles(home_state, school_state), geo_direction or "near"))
     if climate_stated and climate_importance != "not_mentioned":
         state_set = COASTAL_STATES if is_ocean_related else WARM_STATES

@@ -36,6 +36,14 @@ def test_geography_fit_inactive_when_nothing_stated():
     assert score == 0.0
 
 
+def test_geography_fit_handles_state_outside_centroid_table_gracefully():
+    # Puerto Rico (and other territories) aren't in STATE_CENTROIDS; the geo
+    # sub-signal should be skipped rather than raising a KeyError.
+    score, active = geography_fit("PA", "PR", True, "preferred", "near", False, "not_mentioned", False)
+    assert active is False
+    assert score == 0.0
+
+
 def test_geography_fit_uses_coastal_states_for_ocean_interest():
     # Arizona is warm but not coastal -> should score 0 for a marine-biology student
     score, active = geography_fit(

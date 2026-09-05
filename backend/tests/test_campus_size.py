@@ -6,6 +6,15 @@ def test_inactive_when_not_stated():
     assert active is False
 
 
+def test_inactive_when_stated_but_preference_missing():
+    # A profile can plausibly have stated=True with preference=None (e.g. the
+    # LLM detected campus size was mentioned but couldn't classify it) --
+    # this must not KeyError on SIZE_BANDS[None].
+    score, active = campus_size_fit(8000, True, None, "preferred")
+    assert active is False
+    assert score == 0.0
+
+
 def test_any_school_inside_band_gets_max_score():
     low_end, active1 = campus_size_fit(4900, True, "small", "preferred")
     mid, active2 = campus_size_fit(2500, True, "small", "preferred")
