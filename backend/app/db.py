@@ -17,9 +17,25 @@ def get_eligible_schools(conn, cip_2digit=None, required_state=None, required_bu
     if required_budget is not None:
         query += " AND (net_price_overall IS NULL OR net_price_overall <= ?)"
         params.append(required_budget)
+    # Explicit ordering: tie-breaking downstream (pipeline sorting, dream-school
+    # merging) must not depend on unordered SQL row order.
+    query += " ORDER BY unit_id"
     rows = [dict(r) for r in conn.execute(query, params).fetchall()]
     if cip_2digit:
+        # Per the design spec, program availability is "checked at cip_4digit
+        # first, falls back to cip_2digit family". A school is eligible if it
+        # has bachelor's-level graduates in ANY 4-digit CIP inside the family
+        # (field_of_study), OR it reports a non-zero share of degrees in that
+        # CIP-2 family (cip2_percentages). The OR keeps eligibility working even
+        # where the institution-level program_percentage mapping has gaps.
         eligible_ids = {
+            r["unit_id"] for r in conn.execute(
+                "SELECT DISTINCT unit_id FROM field_of_study "
+                "WHERE cip_code LIKE ? AND credential_level = 'bachelors' AND graduates > 0",
+                (f"{cip_2digit}.%",),
+            ).fetchall()
+        }
+        eligible_ids |= {
             r["unit_id"] for r in conn.execute(
                 "SELECT DISTINCT unit_id FROM cip2_percentages WHERE cip_2digit = ? AND percentage > 0",
                 (cip_2digit,),
