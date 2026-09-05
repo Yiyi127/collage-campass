@@ -1,0 +1,21 @@
+/* frontend/src/style/tokens.css */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,500;0,700;1,500&family=Spectral:wght@400;600&family=Space+Mono:wght@400;700&display=swap');
+
+:root {
+  --parchment: #EDE3C8;
+  --ink-navy: #1B2A4A;
+  --gold-leaf: #B8862E;
+  --reach-ember: #9B3B26;
+  --target-sage: #5C6E4A;
+  --likely-teal: #2E5C55;
+  --font-display: 'Cormorant', serif;
+  --font-body: 'Spectral', serif;
+  --font-data: 'Space Mono', monospace;
+}
+
+body {
+  background: var(--parchment);
+  color: var(--ink-navy);
+  font-family: var(--font-body);
+  margin: 0;
+}
