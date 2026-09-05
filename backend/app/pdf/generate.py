@@ -96,8 +96,15 @@ def build_pdf(response) -> bytes:
         c.drawString(LEFT_MARGIN + 15, y, f"{star}{entry.name} — {entry.bucket} ({entry.state})")
         y -= 16
         c.setFont("Helvetica-Oblique", 9)
-        c.drawString(LEFT_MARGIN + 15, y, entry.rationale[:110])
-        y -= 20
+        rationale_width = width - 2 * LEFT_MARGIN - 15
+        for line in _wrap(entry.rationale, "Helvetica-Oblique", 9, rationale_width):
+            if y < 60:
+                new_page()
+                y = height - 60
+                c.setFont("Helvetica-Oblique", 9)
+            c.drawString(LEFT_MARGIN + 15, y, line)
+            y -= 12
+        y -= 8
 
     if response.dream_school_exceptions:
         if y < 120:

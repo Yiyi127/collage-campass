@@ -6,7 +6,7 @@ import httpx
 import pytest
 from scripts.refresh_data import (
     build_database, institution_fields_string, fetch_institutions,
-    fetch_field_of_study, _PROGRAM_PERCENTAGE_TO_CIP2,
+    extract_field_of_study_records, _PROGRAM_PERCENTAGE_TO_CIP2,
 )
 
 SAMPLE_INSTITUTIONS = [
@@ -101,15 +101,54 @@ def test_fetch_institutions_sends_the_full_fields_string():
     assert ".by_income_level." in sent_fields
 
 
-def test_fetch_field_of_study_filters_to_bachelors_and_requests_explicit_fields():
-    payload = {"results": [{"unitid": 1}], "metadata": {"total": 1}}
-    with patch("scripts.refresh_data.httpx.get", return_value=_ok_response(payload)) as mock_get:
-        fetch_field_of_study("fake-key")
-    params = mock_get.call_args.kwargs["params"]
-    assert params["credlev"] == 3
-    for key in ("unitid", "cipcode", "credlev", "counts.ipeds_count",
-                "earnings.median", "debt.median"):
-        assert key in params["fields"].split(",")
+def test_institution_fields_string_requests_the_nested_field_of_study_array():
+    # Field of study is nested per-institution, not a separate endpoint
+    # (verified live: /schools/fieldofstudy is a 404 -- the real data lives
+    # at latest.programs.cip_4_digit on the main /schools response).
+    fields = institution_fields_string()
+    assert "latest.programs.cip_4_digit" in fields.split(",")
+
+
+def test_extract_field_of_study_records_keeps_only_bachelors_and_normalizes_cip():
+    institutions = [{
+        "id": 212054,
+        "latest.programs.cip_4_digit": [
+            {
+                "code": "5138", "credential": {"level": 3},
+                "counts": {"ipeds_awards1": 470, "ipeds_awards2": 470},
+                "earnings": {"1_yr": {"overall_median_earnings": 85441}},
+            },
+            {
+                # Not bachelor's -- must be excluded.
+                "code": "0109", "credential": {"level": 5},
+                "counts": {"ipeds_awards2": 0},
+            },
+        ],
+    }]
+    records = extract_field_of_study_records(institutions)
+    assert len(records) == 1
+    assert records[0] == {
+        "unitid": 212054, "cipcode": "51.38", "credlev": 3,
+        "counts.ipeds_count": 470, "earnings.median": 85441, "debt.median": None,
+    }
+
+
+def test_extract_field_of_study_records_falls_back_across_earnings_windows():
+    institutions = [{
+        "id": 1,
+        "latest.programs.cip_4_digit": [{
+            "code": "1101", "credential": {"level": 3},
+            "counts": {"ipeds_awards2": 10},
+            # No 1_yr data reported; should fall back to 4_yr.
+            "earnings": {"1_yr": {}, "4_yr": {"overall_median_earnings": 72000}},
+        }],
+    }]
+    records = extract_field_of_study_records(institutions)
+    assert records[0]["earnings.median"] == 72000
+
+
+def test_extract_field_of_study_records_handles_missing_programs_array():
+    assert extract_field_of_study_records([{"id": 1}]) == []
 
 
 def _rate_limited_response():

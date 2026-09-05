@@ -1,6 +1,6 @@
 # backend/app/schemas.py
 from typing import Literal, Optional
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Importance = Literal["not_mentioned", "default", "preferred", "required"]
 
@@ -70,6 +70,15 @@ class DreamSchool(BaseModel):
 
 
 class StudentProfile(BaseModel):
+    # extra="forbid" is load-bearing: verified live (2026-09) that Claude can
+    # wrap its tool_use output in an unexpected top-level key (e.g.
+    # {"profile": {...}}). Every field here has a default, so extra="ignore"
+    # would silently accept that as "zero fields extracted" -- a total
+    # extraction failure that validates successfully and is never retried.
+    # "forbid" turns it into a ValidationError, which extract_profile's
+    # retry-once logic already handles correctly.
+    model_config = ConfigDict(extra="forbid")
+
     academics: Academics = Field(default_factory=Academics)
     interests: Interests = Field(default_factory=Interests)
     location: Location = Field(default_factory=Location)

@@ -173,14 +173,23 @@ _BASE_INSTITUTION_FIELDS = (
     "latest.admissions.sat_scores.75th_percentile.math",
     "latest.student.size",
     "latest.cost.avg_net_price.overall",
+    # Field-of-study data is NOT a separate endpoint (an earlier version of this
+    # script assumed `/schools/fieldofstudy` existed -- it returns 404). It is
+    # nested per-institution on the main /schools endpoint instead, as a full
+    # array of program records. Verified live 2026-09: requesting a sub-field
+    # path here (e.g. "...cip_4_digit.earnings") silently drops nested keys
+    # deeper than credential/counts, so we request the whole array unfiltered
+    # and flatten it ourselves in `extract_field_of_study_records`.
+    "latest.programs.cip_4_digit",
 )
 
-# These suffixes match the keys `build_database` reads out of each
-# field-of-study record. Like the program_percentage suffixes above, verify
-# against a live response the first time `refresh-data` runs for real.
-FIELD_OF_STUDY_FIELDS = (
-    "unitid,cipcode,credlev,counts.ipeds_count,earnings.median,debt.median"
-)
+# Real earnings windows Scorecard reports, tried in order (some programs only
+# report a subset). Debt is intentionally not extracted: nothing in this app's
+# scoring reads median_debt (grep confirms it's stored but never scored), and
+# the live debt payload's shape varies per program (parent_plus/staff_grad_plus
+# breakdowns rather than a single median), so it isn't worth the parsing
+# complexity for a field with zero downstream consumers.
+_EARNINGS_WINDOWS = ("1_yr", "4_yr", "5_yr")
 
 
 def institution_fields_string() -> str:
@@ -242,29 +251,54 @@ def fetch_institutions(api_key: str) -> list[dict]:
     return results
 
 
-def fetch_field_of_study(api_key: str) -> list[dict]:
-    results = []
-    page = 0
-    while True:
-        data = _get_with_retry(
-            "https://api.data.gov/ed/collegescorecard/v1/schools/fieldofstudy",
-            {
-                "api_key": api_key, "fields": FIELD_OF_STUDY_FIELDS,
-                "credlev": 3,  # bachelor's-level only -- the only level this app scores
-                "per_page": 100, "page": page,
-            },
-        )
-        results.extend(data["results"])
-        if len(results) >= data["metadata"]["total"]:
-            break
-        page += 1
-    return results
+def _normalize_cip4(code: str) -> str:
+    """Scorecard's cip_4_digit `code` is a bare 4-digit string (e.g. "0301"),
+    a 2-digit CIP family plus two more digits -- not the full 6-digit official
+    CIP code. Dot-separate it to "03.01" for consistent, matchable storage."""
+    return f"{code[:2]}.{code[2:]}" if len(code) == 4 else code
+
+
+def _best_effort_earnings(earnings: dict | None) -> float | None:
+    if not earnings:
+        return None
+    for window in _EARNINGS_WINDOWS:
+        value = (earnings.get(window) or {}).get("overall_median_earnings")
+        if value is not None:
+            return value
+    return None
+
+
+def extract_field_of_study_records(institution_records: list[dict]) -> list[dict]:
+    """Flatten each institution's nested `latest.programs.cip_4_digit` array
+    into the flat per-program record shape `build_database` expects, keeping
+    only bachelor's-level programs (credential.level == 3 -- the only level
+    this app scores)."""
+    records = []
+    for rec in institution_records:
+        for program in rec.get("latest.programs.cip_4_digit") or []:
+            if (program.get("credential") or {}).get("level") != 3:
+                continue
+            counts = program.get("counts") or {}
+            records.append({
+                "unitid": rec["id"],
+                "cipcode": _normalize_cip4(program.get("code", "")),
+                "credlev": 3,
+                "counts.ipeds_count": _first_not_none(
+                    counts.get("ipeds_awards2"), counts.get("ipeds_awards1")
+                ),
+                "earnings.median": _best_effort_earnings(program.get("earnings")),
+                "debt.median": None,
+            })
+    return records
 
 
 if __name__ == "__main__":
     import os
+    from dotenv import load_dotenv
+
+    load_dotenv()
     key = os.environ["COLLEGE_SCORECARD_API_KEY"]
     institutions = fetch_institutions(key)
-    field_of_study = fetch_field_of_study(key)
+    field_of_study = extract_field_of_study_records(institutions)
     build_database(institutions, field_of_study, "scorecard.sqlite", scorecard_data_year="2023-24")
     print(f"Wrote scorecard.sqlite with {len(institutions)} institutions, {len(field_of_study)} field-of-study rows")

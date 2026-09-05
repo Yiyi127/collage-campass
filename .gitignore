@@ -9,6 +9,11 @@ __pycache__/
 backend/scorecard.sqlite
 *.sqlite
 
+# Secrets
+.env
+*.env
+!.env.example
+
 # OS
 .DS_Store
 

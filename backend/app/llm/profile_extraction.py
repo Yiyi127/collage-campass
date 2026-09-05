@@ -20,7 +20,10 @@ SYSTEM_PROMPT = (
     "When an AP course is mentioned, record its subject; only include a score if one was "
     "explicitly stated — never invent a score just to fill the field. "
     "Do not invent facts not present in the text. "
-    "Call the record_student_profile tool with the extracted profile."
+    "Call the record_student_profile tool, setting its top-level arguments "
+    "directly to academics, interests, location, financial, campus_size, "
+    "dream_schools, and narrative_context -- do not nest them under an "
+    "additional wrapper key such as 'profile'."
 )
 
 
@@ -30,7 +33,7 @@ class ProfileExtractionError(Exception):
 
 def _call_and_validate(client, description):
     response = client.messages.create(
-        model="claude-sonnet-4-5",
+        model="claude-sonnet-5",
         max_tokens=1024,
         system=SYSTEM_PROMPT,
         tools=[EXTRACTION_TOOL],

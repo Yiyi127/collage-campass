@@ -39,7 +39,7 @@ def _fallback(colleges):
 def generate_explanations(client, profile, colleges):
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-5", max_tokens=1024, system=SYSTEM_PROMPT,
+            model="claude-sonnet-5", max_tokens=1024, system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": _build_user_message(profile, colleges)}],
         )
     except anthropic.APIError:
