@@ -116,7 +116,12 @@ def run_pipeline(conn, profile, national_medians):
     for s in scored:
         by_bucket[s["bucket"]].append(s)
     for bucket, target_count in TARGET_COUNTS.items():
-        pool = sorted(by_bucket[bucket], key=lambda s: s["total_preference_score"], reverse=True)
+        # Explicit secondary key: ties break on unit_id rather than on whatever
+        # order SQLite happened to return the rows in.
+        pool = sorted(
+            by_bucket[bucket],
+            key=lambda s: (-s["total_preference_score"], s["school"]["unit_id"]),
+        )
         chosen = pool[:target_count]
         chosen_ids = {c["school"]["unit_id"] for c in chosen}
         for s in pool:

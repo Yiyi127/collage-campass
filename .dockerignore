@@ -3,3 +3,4 @@ frontend/dist
 backend/tests
 backend/**/__pycache__
 .git
+backend/venv

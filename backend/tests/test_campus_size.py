@@ -27,3 +27,50 @@ def test_outside_band_decays_toward_zero():
     far_outside, _ = campus_size_fit(20000, True, "small", "preferred")
     assert 0 < just_outside < 1.0
     assert far_outside < just_outside
+
+
+# --- Band edges ------------------------------------------------------------
+# The bands are half-open: small [0, 5000), medium [5000, 15000), large
+# [15000, inf). These pin down which side of each boundary a school lands on.
+
+
+def test_lower_band_edge_5000_belongs_to_medium_not_small():
+    medium, active_medium = campus_size_fit(5000, True, "medium", "preferred")
+    assert active_medium
+    assert medium == 1.0
+    # Exactly at the edge, "small" is outside the band but the overshoot is
+    # zero, so it still scores the band maximum -- the boundary is continuous.
+    small, active_small = campus_size_fit(5000, True, "small", "preferred")
+    assert active_small
+    assert small == 1.0
+
+
+def test_upper_band_edge_15000_belongs_to_large_not_medium():
+    large, active_large = campus_size_fit(15000, True, "large", "preferred")
+    assert active_large
+    assert large == 1.0
+    medium, active_medium = campus_size_fit(15000, True, "medium", "preferred")
+    assert active_medium
+    assert medium == 1.0  # zero overshoot at the shared boundary
+
+
+def test_just_past_each_edge_is_strictly_below_the_band_maximum():
+    assert campus_size_fit(4999, True, "medium", "preferred")[0] < 1.0
+    assert campus_size_fit(15001, True, "medium", "preferred")[0] < 1.0
+
+
+# --- Unusable enrollment values --------------------------------------------
+
+
+def test_zero_enrollment_is_treated_as_missing_data():
+    score, active = campus_size_fit(0, True, "small", "preferred")
+    assert active is False
+    assert score == 0.0
+
+
+def test_negative_enrollment_is_treated_as_missing_data():
+    # A negative enrollment is a bad row, not an extremely small school; it must
+    # not produce a near-perfect "small campus" score.
+    score, active = campus_size_fit(-500, True, "small", "preferred")
+    assert active is False
+    assert score == 0.0

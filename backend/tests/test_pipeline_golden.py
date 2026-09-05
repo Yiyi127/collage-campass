@@ -122,3 +122,30 @@ def test_dream_school_forced_into_output_even_when_truncated_by_score():
         assert {"Affordable A", "Affordable B", "Affordable C"}.issubset(reach_names)
         assert "Pricey Dream School" in reach_names
         assert result["dream_school_exceptions"] == []
+
+
+def test_ties_are_broken_deterministically_by_unit_id():
+    # Three identical schools in the same bucket score identically; the ordering
+    # must come from an explicit unit_id tie-break, not from SQL row order.
+    institutions = [
+        {"id": unit_id, "school.name": f"Identical College {unit_id}", "school.state": "PA",
+         "school.operating": 1, "latest.school.degrees_awarded.predominant": 3,
+         "latest.admissions.admission_rate.overall": 0.70,
+         "latest.admissions.sat_scores.25th_percentile.critical_reading": 500,
+         "latest.admissions.sat_scores.25th_percentile.math": 500,
+         "latest.admissions.sat_scores.75th_percentile.critical_reading": 620,
+         "latest.admissions.sat_scores.75th_percentile.math": 620,
+         "latest.student.size": 8000, "latest.cost.avg_net_price.overall": 20000,
+         "latest.academics.program_percentage.computer": 0.10}
+        for unit_id in (300, 100, 200)
+    ]
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "ties.sqlite")
+        build_database(institutions, [], path, scorecard_data_year="test-fixture")
+        conn = get_connection(path)
+
+        result = run_pipeline(conn, JOHN_SMITH_PROFILE, NATIONAL_MEDIANS)
+
+        scores = {c["total_preference_score"] for c in result["colleges"]}
+        assert len(scores) == 1, "fixture should produce a genuine tie"
+        assert [c["school"]["unit_id"] for c in result["colleges"]] == [100, 200, 300]

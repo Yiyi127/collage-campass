@@ -2,7 +2,11 @@ SIZE_BANDS = {"small": (0, 5000), "medium": (5000, 15000), "large": (15000, floa
 
 
 def campus_size_fit(enrollment, stated, preference, importance):
-    if not stated or importance == "not_mentioned" or enrollment is None or preference is None:
+    # A non-positive enrollment is unusable data (Scorecard suppression, a bad
+    # row), not a genuinely tiny school -- treat it like a missing value and
+    # deactivate the dimension rather than scoring against a nonsense number.
+    if (not stated or importance == "not_mentioned" or preference is None
+            or enrollment is None or enrollment <= 0):
         return 0.0, False
     lo, hi = SIZE_BANDS[preference]
     if lo <= enrollment < hi:

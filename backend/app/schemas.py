@@ -86,7 +86,7 @@ class GenerateListRequest(BaseModel):
 class CollegeEntry(BaseModel):
     name: str
     state: str
-    bucket: str
+    bucket: Literal["Reach", "Target", "Likely"]
     confidence: str
     admission_rate: Optional[float]
     sat_p25: Optional[int]

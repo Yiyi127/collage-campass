@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { computeStarPositions, type CollegeForChart } from '../chart/geometry'
+import { computeStarPositions, RING_RADII, type CollegeForChart } from '../chart/geometry'
 
 const props = defineProps<{
   colleges: CollegeForChart[]
@@ -26,7 +26,7 @@ const center = 220
     :aria-label="`Star chart for ${studentName}`"
   >
     <circle
-      v-for="r in [65, 130, 200]"
+      v-for="r in RING_RADII"
       :key="r"
       :cx="center"
       :cy="center"

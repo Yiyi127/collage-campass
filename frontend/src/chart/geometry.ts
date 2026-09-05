@@ -14,7 +14,11 @@ export interface StarPosition {
   y: number
 }
 
-const RING_RADIUS: Record<Bucket, number> = { Reach: 200, Target: 130, Likely: 65 }
+export const RING_RADIUS: Record<Bucket, number> = { Reach: 200, Target: 130, Likely: 65 }
+
+/** Ring radii ordered innermost-first, for drawing the concentric circles.
+ *  Exported so StarChart.vue can't drift from the geometry it plots against. */
+export const RING_RADII: number[] = Object.values(RING_RADIUS).sort((a, b) => a - b)
 
 export function computeStarPositions(colleges: CollegeForChart[]): StarPosition[] {
   const byBucket: Record<Bucket, CollegeForChart[]> = { Reach: [], Target: [], Likely: [] }

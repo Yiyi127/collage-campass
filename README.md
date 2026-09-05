@@ -42,3 +42,17 @@ npm run dev
 
 To refresh the underlying Scorecard data later (e.g. next admissions cycle), trigger a new
 deploy — the build step re-runs `refresh_data.py` against the then-current API.
+
+### Known limitation: `COLLEGE_SCORECARD_API_KEY` persists in image layers
+
+The Dockerfile passes the key in via a build `ARG` and then an `ENV`, which bakes it into
+the built image's layer metadata — anyone who can pull the image can read it back with
+`docker history` or `docker inspect`. The real risk is low: this is a free, rate-limited key
+for a public government dataset, not a payment or production credential, and it is not
+needed at runtime at all. Rotating it is a one-minute request at
+https://collegescorecard.ed.gov/data/api-documentation/.
+
+The clean fix is a BuildKit secret mount (`RUN --mount=type=secret,id=scorecard ...`), which
+keeps the value out of every layer. It is not implemented here because it could not be
+verified against a real Docker build in this environment; treat it as the intended follow-up
+if the image is ever published anywhere non-private.
