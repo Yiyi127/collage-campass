@@ -31,7 +31,7 @@ async function handleSubmit(description: string) {
     <!-- Always mounted: this is the SAME element that idles as the logo on
          the input view and grows/moves to center to become the loading
          indicator, driven purely by the `active` prop, not a v-if swap. -->
-    <StarLogo :active="loading" />
+    <StarLogo :active="loading" :corner="!!result" />
     <InputView v-if="!result && !loading" @submit="handleSubmit" />
     <LoadingStatus v-if="loading" :description="submittedDescription" />
     <p v-if="error" class="status error">{{ error }}</p>

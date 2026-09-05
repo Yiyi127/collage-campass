@@ -112,16 +112,21 @@ function distanceText(miles: number | null) {
       <circle :cx="center" :cy="center" r="7" fill="var(--gold-leaf)" class="student-star" />
       <text :x="center" :y="center - 12" text-anchor="middle" class="student-label">{{ studentName }}</text>
       <g
-        v-for="(p, i) in positions"
+        v-for="p in positions"
         :key="p.unitId"
         class="star-point"
         @click="emit('select', p.unitId)"
         @mouseenter="hoveredId = p.unitId"
         @mouseleave="hoveredId = null"
       >
+        <!-- Larger transparent hit-area so click/hover doesn't require
+             landing exactly on the small visible ring (fill="transparent",
+             not "none" -- "none" would opt this circle out of hit-testing
+             entirely). -->
+        <circle :cx="center + p.x" :cy="center + p.y" r="18" fill="transparent" />
         <circle :cx="center + p.x" :cy="center + p.y" r="9" fill="var(--parchment)" :stroke="bucketColor[p.bucket]" stroke-width="1.5" />
         <text :x="center + p.x" :y="center + p.y + 3" text-anchor="middle" class="point-number" :fill="bucketColor[p.bucket]">
-          {{ i + 1 }}
+          {{ p.unitId }}
         </text>
       </g>
     </svg>

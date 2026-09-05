@@ -10,10 +10,10 @@ function handleSubmit() {
   emit('submit', description.value)
 }
 
-// A dim field of small background stars plus a handful of brighter
-// "named" gold stars connected into a constellation -- generated once per
-// page load (not per-render) so the field is stable for the whole visit
-// but varies visit to visit, like actually looking up at the sky.
+// Stars are plain HTML circles (fixed px width/height + border-radius:50%),
+// not SVG shapes in a stretched viewBox -- a non-uniformly scaled SVG
+// circle renders as an ellipse ("egg"), which is exactly the bug in the
+// previous pass. A CSS circle stays a circle at any viewport size.
 function randomStars(count: number, sizeRange: [number, number]) {
   return Array.from({ length: count }, () => ({
     top: Math.random() * 100,
@@ -24,22 +24,22 @@ function randomStars(count: number, sizeRange: [number, number]) {
   }))
 }
 
-const backgroundStars = randomStars(55, [1, 2.2])
-// The constellation: a handful of brighter stars, biased toward the outer
-// thirds of the frame so they frame the input column rather than sit
-// behind it, connected in sequence into one continuous line -- the same
-// "chart a path between named stars" idea the result page's chart pays
-// off for real.
-const constellationStars = Array.from({ length: 8 }, (_, i) => {
-  const edge = i % 2 === 0
-  return {
-    top: 8 + Math.random() * 84,
-    left: edge ? Math.random() * 22 : 78 + Math.random() * 22,
-    size: 2.6 + Math.random() * 2,
-    duration: 3 + Math.random() * 3,
-    delay: Math.random() * 4,
-  }
-})
+const backgroundStars = randomStars(70, [1.5, 3])
+
+// The constellation: one graceful, hand-wobbled arc of bright gold stars
+// strung across the top of the frame -- like a belt in the sky above the
+// title, not scattered debris with rays crossing the whole page (the
+// previous version zigzagged between the left/right edges, which read as
+// noise rather than a shape). Points are monotonic in x, so the connecting
+// line can only ever curve, never cross itself.
+const CONSTELLATION_X = [7, 20, 33, 47, 61, 75, 88]
+const constellationStars = CONSTELLATION_X.map((left, i) => ({
+  left,
+  top: 6 + Math.sin(i * 1.7) * 5 + Math.random() * 3,
+  size: 3 + Math.random() * 2,
+  duration: 3 + Math.random() * 3,
+  delay: Math.random() * 4,
+}))
 const constellationPoints = constellationStars.map((s) => `${s.left},${s.top}`).join(' ')
 
 // Subtle parallax: the constellation (closer) drifts a bit more than the
@@ -65,55 +65,55 @@ onUnmounted(() => {
 
 <template>
   <div class="input-view">
-    <svg class="starfield" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-      <g
+    <div class="starfield" aria-hidden="true">
+      <div
         class="layer layer-far"
-        :style="{ transform: `translate(${parallax.x * 0.6}px, ${parallax.y * 0.6}px)` }"
+        :style="{ transform: `translate(${parallax.x * 5}px, ${parallax.y * 5}px)` }"
       >
-        <circle
+        <span
           v-for="(star, i) in backgroundStars"
           :key="'bg-' + i"
-          :cx="star.left"
-          :cy="star.top"
-          :r="star.size * 0.12"
-          fill="var(--ink-navy)"
-          class="twinkle"
-          :style="{ animationDuration: `${star.duration}s`, animationDelay: `${star.delay}s` }"
+          class="dot dim"
+          :style="{
+            top: `${star.top}%`,
+            left: `${star.left}%`,
+            width: `${star.size}px`,
+            height: `${star.size}px`,
+            animationDuration: `${star.duration}s`,
+            animationDelay: `${star.delay}s`,
+          }"
         />
-      </g>
-      <g
-        class="layer layer-near"
-        :style="{ transform: `translate(${parallax.x * 1.6}px, ${parallax.y * 1.6}px)` }"
-      >
+      </div>
+      <svg class="lines" viewBox="0 0 100 100" preserveAspectRatio="none">
         <polyline
           :points="constellationPoints"
           fill="none"
           stroke="var(--ink-navy)"
-          stroke-width="0.08"
+          stroke-width="0.12"
+          vector-effect="non-scaling-stroke"
           class="constellation-line"
+          :style="{ transform: `translate(${parallax.x * 14}px, ${parallax.y * 14}px)` }"
         />
-        <circle
+      </svg>
+      <div
+        class="layer layer-near"
+        :style="{ transform: `translate(${parallax.x * 14}px, ${parallax.y * 14}px)` }"
+      >
+        <span
           v-for="(star, i) in constellationStars"
           :key="'const-' + i"
-          :cx="star.left"
-          :cy="star.top"
-          :r="star.size * 0.55"
-          fill="var(--gold-leaf)"
-          opacity="0.18"
-          class="glow"
+          class="dot bright"
+          :style="{
+            top: `${star.top}%`,
+            left: `${star.left}%`,
+            width: `${star.size}px`,
+            height: `${star.size}px`,
+            animationDuration: `${star.duration}s`,
+            animationDelay: `${star.delay}s`,
+          }"
         />
-        <circle
-          v-for="(star, i) in constellationStars"
-          :key="'core-' + i"
-          :cx="star.left"
-          :cy="star.top"
-          :r="star.size * 0.16"
-          fill="var(--gold-leaf)"
-          class="twinkle-bright"
-          :style="{ animationDuration: `${star.duration}s`, animationDelay: `${star.delay}s` }"
-        />
-      </g>
-    </svg>
+      </div>
+    </div>
     <div class="vignette" aria-hidden="true" />
     <div class="content">
       <h1 class="title">College Compass</h1>
@@ -143,25 +143,40 @@ onUnmounted(() => {
 .starfield {
   position: fixed;
   inset: 0;
-  width: 100%;
-  height: 100%;
   pointer-events: none;
 }
 .layer {
+  position: absolute;
+  inset: 0;
   transition: transform 0.2s ease-out;
 }
-.twinkle {
+.lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.dot {
+  position: absolute;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.dot.dim {
+  background: var(--ink-navy);
   animation-name: twinkle;
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
 }
-.twinkle-bright {
+.dot.bright {
+  background: var(--gold-leaf);
+  box-shadow: 0 0 6px 2px rgba(184, 134, 46, 0.55);
   animation-name: twinkle-bright;
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
 }
 .constellation-line {
-  opacity: 0.22;
+  opacity: 0.35;
+  transition: transform 0.2s ease-out;
 }
 .vignette {
   position: fixed;
@@ -226,15 +241,15 @@ textarea {
   50% { opacity: 0.55; }
 }
 @keyframes twinkle-bright {
-  0%, 100% { opacity: 0.55; }
+  0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .twinkle, .twinkle-bright {
+  .dot {
     animation: none;
-    opacity: 0.5;
+    opacity: 0.4;
   }
-  .layer {
+  .layer, .constellation-line {
     transition: none;
   }
 }
