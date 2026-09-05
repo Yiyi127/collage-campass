@@ -90,6 +90,57 @@ def test_pdf_chart_draws_labelled_rings(uncompressed_pdf):
         assert label in pdf
 
 
+def test_pdf_embeds_a_clickable_link_for_a_school_with_a_url(uncompressed_pdf):
+    pdf = build_pdf(_response())
+    assert b"https://drexel.edu" in pdf
+
+
+def test_pdf_omits_link_for_a_school_without_a_url(uncompressed_pdf):
+    pdf = build_pdf(_response(colleges=[
+        {"name": "No Website University", "state": "PA", "bucket": "Target", "confidence": "high",
+         "admission_rate": 0.5, "sat_p25": None, "sat_p75": None, "program_match_type": None,
+         "net_price": None, "affordability_basis": None, "is_dream_school": False,
+         "rationale": "Fits.", "match_score": 60, "distance_miles": None, "url": None},
+    ]))
+    assert b"No Website University" in pdf
+
+
+def test_pdf_section_numbering_stays_tied_to_original_order_not_section_order(uncompressed_pdf):
+    # Regression test: the section list must number each school by its
+    # position in the ORIGINAL colleges list, not by where re-grouping into
+    # Reach/Target/Likely sections happens to place it -- otherwise the
+    # printed number silently drifts from the number on the same school's
+    # chart point (the exact bug class fixed in the web StarChart.vue).
+    pdf = build_pdf(_response(colleges=[
+        {"name": "Likely College", "state": "PA", "bucket": "Likely", "confidence": "high",
+         "admission_rate": 0.9, "sat_p25": None, "sat_p75": None, "program_match_type": None,
+         "net_price": None, "affordability_basis": None, "is_dream_school": False,
+         "rationale": "Safe choice.", "match_score": 90, "distance_miles": None, "url": None},
+        {"name": "Reach College", "state": "PA", "bucket": "Reach", "confidence": "medium",
+         "admission_rate": 0.1, "sat_p25": None, "sat_p75": None, "program_match_type": None,
+         "net_price": None, "affordability_basis": None, "is_dream_school": False,
+         "rationale": "A stretch.", "match_score": 40, "distance_miles": None, "url": None},
+        {"name": "Target College", "state": "PA", "bucket": "Target", "confidence": "high",
+         "admission_rate": 0.5, "sat_p25": None, "sat_p75": None, "program_match_type": None,
+         "net_price": None, "affordability_basis": None, "is_dream_school": False,
+         "rationale": "Good fit.", "match_score": 70, "distance_miles": None, "url": None},
+    ]))
+    # ReportLab draws the "N. " prefix and the school name as separate text
+    # objects (two Tj operators), so they never appear as one literal
+    # substring -- assert each prefix is immediately followed by its
+    # matching name in the content stream instead.
+    def assert_prefix_precedes_name(prefix: str, name: str):
+        prefix_idx = pdf.find(f"({prefix}) Tj".encode())
+        assert prefix_idx != -1, f"prefix {prefix!r} not found"
+        name_idx = pdf.find(f"({name})".encode())
+        assert name_idx != -1, f"name {name!r} not found"
+        assert 0 < name_idx - prefix_idx < 200, f"{name!r} did not immediately follow {prefix!r}"
+
+    assert_prefix_precedes_name("1. ", "Likely College")
+    assert_prefix_precedes_name("2. ", "Reach College")
+    assert_prefix_precedes_name("3. ", "Target College")
+
+
 def test_pdf_ring_radii_match_the_shared_chart_geometry():
     # The PDF must draw the same radii the web StarChart does.
     assert RING_RADIUS == {"Reach": 200, "Target": 130, "Likely": 65}
