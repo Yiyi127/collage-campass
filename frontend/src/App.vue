@@ -3,14 +3,17 @@
 import { ref } from 'vue'
 import InputView from './views/InputView.vue'
 import ResultsView from './views/ResultsView.vue'
-import LoadingChart from './components/LoadingChart.vue'
+import StarLogo from './components/StarLogo.vue'
+import LoadingStatus from './components/LoadingStatus.vue'
 import { generateList, type GenerateListResponse } from './api'
 
 const result = ref<GenerateListResponse | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
+const submittedDescription = ref('')
 
 async function handleSubmit(description: string) {
+  submittedDescription.value = description
   loading.value = true
   error.value = null
   try {
@@ -25,8 +28,12 @@ async function handleSubmit(description: string) {
 
 <template>
   <main>
+    <!-- Always mounted: this is the SAME element that idles as the logo on
+         the input view and grows/moves to center to become the loading
+         indicator, driven purely by the `active` prop, not a v-if swap. -->
+    <StarLogo :active="loading" />
     <InputView v-if="!result && !loading" @submit="handleSubmit" />
-    <LoadingChart v-if="loading" />
+    <LoadingStatus v-if="loading" :description="submittedDescription" />
     <p v-if="error" class="status error">{{ error }}</p>
     <ResultsView v-if="result" :result="result" student-name="Your Student" />
   </main>
