@@ -58,3 +58,58 @@ def test_extract_profile_raises_after_two_failures():
 
     with pytest.raises(ProfileExtractionError):
         extract_profile(client, "some description")
+
+
+def test_ap_score_validates_when_score_is_none():
+    """An AP mention with no stated score must not force a fabricated number."""
+    tool_input = dict(VALID_TOOL_INPUT)
+    tool_input["academics"] = {
+        "gpa": 3.5, "sat": 1230, "act": None,
+        "ap_scores": [{"subject": "Biology", "score": None}],
+    }
+
+    profile = StudentProfile.model_validate(tool_input)
+
+    assert profile.academics.ap_scores[0].subject == "Biology"
+    assert profile.academics.ap_scores[0].score is None
+
+
+def test_ap_score_validates_bare_subject_string():
+    """A bare subject-name string (no score object at all) must also validate."""
+    tool_input = dict(VALID_TOOL_INPUT)
+    tool_input["academics"] = {
+        "gpa": 3.5, "sat": 1230, "act": None,
+        "ap_scores": ["Biology"],
+    }
+
+    profile = StudentProfile.model_validate(tool_input)
+
+    assert profile.academics.ap_scores[0].subject == "Biology"
+    assert profile.academics.ap_scores[0].score is None
+
+
+def test_marine_biology_golden_fixture_validates_against_student_profile():
+    """Task 11's approved golden fixture (bare-string ap_scores) must round-trip
+    through StudentProfile without raising, since it represents a realistic
+    extraction result that run_pipeline already accepts."""
+    from tests.test_pipeline_golden import MARINE_BIOLOGY_PROFILE
+
+    profile = StudentProfile.model_validate(MARINE_BIOLOGY_PROFILE)
+
+    assert profile.academics.ap_scores[0].subject == "Biology"
+    assert profile.academics.ap_scores[0].score is None
+
+
+def test_extract_profile_accepts_ap_mention_with_no_score():
+    client = MagicMock()
+    tool_input = dict(VALID_TOOL_INPUT)
+    tool_input["academics"] = {
+        "gpa": 3.5, "sat": 1230, "act": None,
+        "ap_scores": [{"subject": "Chemistry", "score": None}],
+    }
+    client.messages.create.return_value = _mock_response(tool_input)
+
+    profile = extract_profile(client, "took AP Chemistry, no score mentioned")
+
+    assert profile.academics.ap_scores[0].subject == "Chemistry"
+    assert profile.academics.ap_scores[0].score is None

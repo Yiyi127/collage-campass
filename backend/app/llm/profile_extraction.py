@@ -15,7 +15,10 @@ SYSTEM_PROMPT = (
     "'required' means the counselor stated it as non-negotiable (e.g. 'must stay in-state'); "
     "a soft mention like 'would be a plus' should be 'default', not 'preferred'. "
     "cip_2digit must be a standard 2-digit CIP code for the student's stated field of interest, "
-    "or null if no field of interest is mentioned. Do not invent facts not present in the text. "
+    "or null if no field of interest is mentioned. "
+    "When an AP course is mentioned, record its subject; only include a score if one was "
+    "explicitly stated — never invent a score just to fill the field. "
+    "Do not invent facts not present in the text. "
     "Call the record_student_profile tool with the extracted profile."
 )
 

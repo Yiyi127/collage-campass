@@ -1,13 +1,22 @@
 # backend/app/schemas.py
 from typing import Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 Importance = Literal["not_mentioned", "default", "preferred", "required"]
 
 
 class APScore(BaseModel):
     subject: str
-    score: int
+    score: Optional[int] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_bare_subject(cls, data):
+        # Allow a bare subject-name string (e.g. "Biology") when no score was
+        # stated, so the LLM never has to fabricate a score to pass validation.
+        if isinstance(data, str):
+            return {"subject": data, "score": None}
+        return data
 
 
 class Academics(BaseModel):
