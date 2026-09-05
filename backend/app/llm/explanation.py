@@ -1,5 +1,6 @@
 # backend/app/llm/explanation.py
 import json
+import anthropic
 
 SYSTEM_PROMPT = (
     "You write grounded explanations for a college list a counselor will hand to a student. "
@@ -30,11 +31,23 @@ def _template_rationale(college):
             f"admissions data for your profile.")
 
 
+def _fallback(colleges):
+    summary = "Here is a college list built from your student's real academic profile and stated preferences."
+    return summary, {c["school"]["unit_id"]: _template_rationale(c) for c in colleges}
+
+
 def generate_explanations(client, profile, colleges):
-    response = client.messages.create(
-        model="claude-sonnet-4-5", max_tokens=1024, system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": _build_user_message(profile, colleges)}],
-    )
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-5", max_tokens=1024, system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": _build_user_message(profile, colleges)}],
+        )
+    except anthropic.APIError:
+        # Graceful degradation: the list itself is entirely deterministic, so an
+        # unavailable explanation service must never fail the whole request --
+        # fall back to the same templated rationales used for malformed output.
+        return _fallback(colleges)
+
     text_block = next((b for b in response.content if b.type == "text"), None)
     locked_ids = {c["school"]["unit_id"] for c in colleges}
 
@@ -46,6 +59,4 @@ def generate_explanations(client, profile, colleges):
             rationales.setdefault(c["school"]["unit_id"], _template_rationale(c))
         return summary, rationales
     except (json.JSONDecodeError, KeyError, ValueError, TypeError, AttributeError):
-        summary = "Here is a college list built from your student's real academic profile and stated preferences."
-        rationales = {c["school"]["unit_id"]: _template_rationale(c) for c in colleges}
-        return summary, rationales
+        return _fallback(colleges)

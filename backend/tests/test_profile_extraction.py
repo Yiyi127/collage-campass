@@ -113,3 +113,49 @@ def test_extract_profile_accepts_ap_mention_with_no_score():
 
     assert profile.academics.ap_scores[0].subject == "Chemistry"
     assert profile.academics.ap_scores[0].score is None
+
+
+# --- Anthropic API errors --------------------------------------------------
+# A raw API failure (rate limit, overload, auth, connection) is deliberately
+# NOT retried and NOT converted into a ProfileExtractionError: it is a
+# transport/service problem rather than a malformed-output problem, and the two
+# need different HTTP statuses (502 vs 422). The SDK already retries internally.
+
+import anthropic
+import httpx
+
+
+def _api_error():
+    return anthropic.APIConnectionError(request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"))
+
+
+def test_api_error_on_the_first_attempt_propagates_without_retrying():
+    client = MagicMock()
+    client.messages.create.side_effect = _api_error()
+
+    with pytest.raises(anthropic.APIError):
+        extract_profile(client, "some description")
+
+    assert client.messages.create.call_count == 1
+
+
+def test_api_error_is_not_masked_as_a_profile_extraction_error():
+    client = MagicMock()
+    client.messages.create.side_effect = _api_error()
+
+    with pytest.raises(anthropic.APIError):
+        extract_profile(client, "some description")
+
+
+def test_api_error_on_the_retry_attempt_propagates_as_an_api_error():
+    # First attempt returns malformed output (legitimately retried), the retry
+    # then hits the API failure -- the caller must still see an APIError, not a
+    # misleading "could not extract a valid profile" message.
+    client = MagicMock()
+    invalid = {"academics": {"gpa": "not-a-number"}}
+    client.messages.create.side_effect = [_mock_response(invalid), _api_error()]
+
+    with pytest.raises(anthropic.APIError):
+        extract_profile(client, "some description")
+
+    assert client.messages.create.call_count == 2

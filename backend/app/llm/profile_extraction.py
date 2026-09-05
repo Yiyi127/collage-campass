@@ -1,4 +1,5 @@
 # backend/app/llm/profile_extraction.py
+import anthropic
 from pydantic import ValidationError
 from app.schemas import StudentProfile
 
@@ -41,11 +42,25 @@ def _call_and_validate(client, description):
 
 
 def extract_profile(client, description: str) -> StudentProfile:
+    """Extract a StudentProfile, retrying once on malformed model output.
+
+    Design choice: an `anthropic.APIError` (rate limit, overload, auth failure,
+    connection error) is deliberately NOT retried here and NOT converted into a
+    ProfileExtractionError. It is a transport/service problem, not a
+    malformed-output problem — the two deserve different HTTP statuses (502 vs
+    422), and the Anthropic SDK already applies its own internal retries, so an
+    extra application-level retry would only double the latency before the same
+    failure. The error is re-raised for the caller to map to a clear message.
+    """
     try:
         return _call_and_validate(client, description)
+    except anthropic.APIError:
+        raise
     except (ValidationError, StopIteration):
         try:
             return _call_and_validate(client, description)
+        except anthropic.APIError:
+            raise
         except (ValidationError, StopIteration) as exc:
             raise ProfileExtractionError(
                 "Could not extract a valid student profile after two attempts."

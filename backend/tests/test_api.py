@@ -1,19 +1,96 @@
+import os
+import sqlite3
+from unittest.mock import patch, MagicMock
+
+import anthropic
+import httpx
+import pytest
 from fastapi.testclient import TestClient
-from app.main import app
+from app.main import app, read_scorecard_status, ScorecardDatabaseError
+from tests.fixtures.sample_schools import build_fixture_db
 
 client = TestClient(app)
 
 
-def test_health_check():
+def _configure(tmp_path, monkeypatch, api_key="test-anthropic-key"):
+    """Point the app at a fresh fixture DB and a non-empty API key."""
+    db_path = os.path.join(tmp_path, "scorecard.sqlite")
+    build_fixture_db(db_path)
+    monkeypatch.setenv("SCORECARD_DB_PATH", db_path)
+    if api_key is None:
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    else:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", api_key)
+    from app.config import get_settings
+    get_settings.cache_clear()
+    return db_path
+
+
+@pytest.fixture(autouse=True)
+def _clear_settings_cache():
+    from app.config import get_settings
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+def test_health_check_reports_scorecard_data_state(tmp_path, monkeypatch):
+    # Fix 4: a deployed instance's data state must be visible without guessing.
+    _configure(tmp_path, monkeypatch)
     response = client.get("/api/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["scorecard_data_year"] == "test-fixture"
+    assert body["school_count"] == 3
 
 
-import tempfile
-import os
-from unittest.mock import patch, MagicMock
-from tests.fixtures.sample_schools import build_fixture_db
+def test_health_check_reports_degraded_for_a_missing_database(tmp_path, monkeypatch):
+    monkeypatch.setenv("SCORECARD_DB_PATH", os.path.join(tmp_path, "nope.sqlite"))
+    from app.config import get_settings
+    get_settings.cache_clear()
+    body = client.get("/api/health").json()
+    assert body["status"] == "degraded"
+    assert body["school_count"] == 0
+
+
+def test_read_scorecard_status_rejects_a_missing_file(tmp_path):
+    with pytest.raises(ScorecardDatabaseError, match="not found"):
+        read_scorecard_status(os.path.join(tmp_path, "missing.sqlite"))
+
+
+def test_read_scorecard_status_rejects_an_accidentally_created_empty_db(tmp_path):
+    # sqlite3.connect() creates the file, which is exactly the silent-failure
+    # mode this check exists to catch.
+    path = os.path.join(tmp_path, "empty.sqlite")
+    sqlite3.connect(path).close()
+    with pytest.raises(ScorecardDatabaseError, match="no `schools` table"):
+        read_scorecard_status(path)
+
+
+def test_read_scorecard_status_rejects_a_zero_row_schools_table(tmp_path):
+    path = os.path.join(tmp_path, "norows.sqlite")
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE schools (unit_id INTEGER)")
+    conn.commit()
+    conn.close()
+    with pytest.raises(ScorecardDatabaseError, match="zero schools"):
+        read_scorecard_status(path)
+
+
+def test_app_startup_fails_loudly_on_a_bad_database_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("SCORECARD_DB_PATH", os.path.join(tmp_path, "nope.sqlite"))
+    from app.config import get_settings
+    get_settings.cache_clear()
+    with pytest.raises(ScorecardDatabaseError):
+        with TestClient(app):  # entering the context manager runs the lifespan
+            pass
+
+
+def test_app_startup_succeeds_with_a_populated_database(tmp_path, monkeypatch):
+    _configure(tmp_path, monkeypatch)
+    with TestClient(app) as started:
+        assert started.get("/api/health").json()["status"] == "ok"
 
 
 def _mock_extraction_response(dream_schools=None):
@@ -65,11 +142,7 @@ def _mock_invalid_extraction_response():
 
 
 def test_generate_list_returns_bucketed_colleges(tmp_path, monkeypatch):
-    db_path = os.path.join(tmp_path, "scorecard.sqlite")
-    build_fixture_db(db_path)
-    monkeypatch.setenv("SCORECARD_DB_PATH", db_path)
-    from app.config import get_settings
-    get_settings.cache_clear()
+    _configure(tmp_path, monkeypatch)
 
     with patch("app.llm.client.anthropic.Anthropic") as MockAnthropic:
         instance = MockAnthropic.return_value
@@ -87,18 +160,13 @@ def test_generate_list_returns_bucketed_colleges(tmp_path, monkeypatch):
     assert all(c["rationale"] for c in body["colleges"])
     drexel = next(c for c in body["colleges"] if c["name"] == "Drexel University")
     assert drexel["rationale"] == "Drexel's co-op program fits your interest in practical, hands-on learning."
-    get_settings.cache_clear()
 
 
 def test_generate_list_handles_excluded_dream_school_without_crashing(tmp_path, monkeypatch):
     # `resolve_dream_school` (Task 10) returns {"status": "excluded", "school": None, ...}
     # when a named dream school can't be matched in the DB (or is closed/non-degree-granting).
     # The endpoint must render that as name="Unknown" rather than crashing on `e["school"]["name"]`.
-    db_path = os.path.join(tmp_path, "scorecard.sqlite")
-    build_fixture_db(db_path)
-    monkeypatch.setenv("SCORECARD_DB_PATH", db_path)
-    from app.config import get_settings
-    get_settings.cache_clear()
+    _configure(tmp_path, monkeypatch)
 
     dream_schools = [{"name": "Totally Fictional University", "reason": "always dreamed of it"}]
 
@@ -120,18 +188,13 @@ def test_generate_list_handles_excluded_dream_school_without_crashing(tmp_path, 
     exception = body["dream_school_exceptions"][0]
     assert exception["name"] == "Unknown"
     assert "Totally Fictional University" in exception["reason"]
-    get_settings.cache_clear()
 
 
 def test_generate_list_returns_422_when_profile_extraction_fails(tmp_path, monkeypatch):
     # extract_profile (Task 12) retries once on invalid tool_use input, then raises
     # ProfileExtractionError. The endpoint must surface that as a clear HTTP 422,
     # not a 500 or a hang, and must not proceed to call run_pipeline/generate_explanations.
-    db_path = os.path.join(tmp_path, "scorecard.sqlite")
-    build_fixture_db(db_path)
-    monkeypatch.setenv("SCORECARD_DB_PATH", db_path)
-    from app.config import get_settings
-    get_settings.cache_clear()
+    _configure(tmp_path, monkeypatch)
 
     with patch("app.llm.client.anthropic.Anthropic") as MockAnthropic:
         instance = MockAnthropic.return_value
@@ -146,7 +209,6 @@ def test_generate_list_returns_422_when_profile_extraction_fails(tmp_path, monke
     body = response.json()
     assert body["detail"]
     assert instance.messages.create.call_count == 2  # both extraction attempts, no explanation call
-    get_settings.cache_clear()
 
 
 def test_generate_pdf_returns_pdf_bytes():
@@ -165,3 +227,54 @@ def test_generate_pdf_returns_pdf_bytes():
     assert response.headers["content-type"] == "application/pdf"
     assert response.content[:4] == b"%PDF"
 
+
+
+# --- Fix 3: Anthropic API failures must not surface as raw 500s -------------
+
+
+def _api_error():
+    return anthropic.APIConnectionError(request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"))
+
+
+def test_generate_list_returns_502_when_extraction_hits_an_api_error(tmp_path, monkeypatch):
+    _configure(tmp_path, monkeypatch)
+
+    with patch("app.llm.client.anthropic.Anthropic") as MockAnthropic:
+        instance = MockAnthropic.return_value
+        instance.messages.create.side_effect = _api_error()
+
+        response = client.post("/api/generate-list", json={"description": "loves programming"})
+
+    assert response.status_code == 502
+    assert "temporarily unavailable" in response.json()["detail"]
+    # An API error is not retried -- it is a transport problem, not bad output.
+    assert instance.messages.create.call_count == 1
+
+
+def test_generate_list_still_succeeds_when_explanation_hits_an_api_error(tmp_path, monkeypatch):
+    # Explanation failures must degrade to templated rationales, never fail the
+    # request -- the list itself is entirely deterministic.
+    _configure(tmp_path, monkeypatch)
+
+    with patch("app.llm.client.anthropic.Anthropic") as MockAnthropic:
+        instance = MockAnthropic.return_value
+        instance.messages.create.side_effect = [_mock_extraction_response(), _api_error()]
+
+        response = client.post("/api/generate-list", json={"description": "loves programming"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["student_summary"]
+    assert all(c["rationale"] for c in body["colleges"])
+
+
+def test_generate_list_reports_a_missing_anthropic_api_key_clearly(tmp_path, monkeypatch):
+    _configure(tmp_path, monkeypatch, api_key=None)
+
+    with patch("app.llm.client.anthropic.Anthropic") as MockAnthropic:
+        response = client.post("/api/generate-list", json={"description": "loves programming"})
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "ANTHROPIC_API_KEY is not configured"
+    # The SDK is never even constructed, so its own opaque error can't fire.
+    MockAnthropic.assert_not_called()

@@ -82,3 +82,37 @@ def test_generate_explanations_backfills_only_the_missing_school_not_the_covered
 
     assert rationales[1] == "Drexel's co-op program fits your practical, hands-on interests."
     assert rationales[2] == _template_rationale(COLLEGES_TWO[1])
+
+
+# --- Anthropic API errors --------------------------------------------------
+# The list is entirely deterministic, so an unavailable explanation service
+# must degrade to templated rationales rather than fail the whole request.
+
+import anthropic
+import httpx
+
+
+def test_generate_explanations_falls_back_to_template_on_api_error():
+    client = MagicMock()
+    client.messages.create.side_effect = anthropic.APIConnectionError(
+        request=httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    )
+
+    summary, rationales = generate_explanations(client, PROFILE, COLLEGES_TWO)
+
+    assert summary  # non-empty fallback summary
+    assert rationales[1] == _template_rationale(COLLEGES_TWO[0])
+    assert rationales[2] == _template_rationale(COLLEGES_TWO[1])
+
+
+def test_generate_explanations_falls_back_on_a_rate_limit_error():
+    client = MagicMock()
+    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    client.messages.create.side_effect = anthropic.RateLimitError(
+        "rate limited", response=httpx.Response(429, request=request), body=None
+    )
+
+    summary, rationales = generate_explanations(client, PROFILE, COLLEGES)
+
+    assert summary
+    assert "Drexel University" in rationales[1]
