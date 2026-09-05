@@ -1,0 +1,16 @@
+# Python
+backend/venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Built/fetched data artifacts
+backend/scorecard.sqlite
+*.sqlite
+
+# OS
+.DS_Store
+
+# SDD workspace (session-local task briefs, reports, review packages)
+.superpowers/
