@@ -1,6 +1,7 @@
 import sqlite3
 import datetime
 import httpx
+import os
 
 SCHEMA = """
 CREATE TABLE schools (
@@ -24,6 +25,8 @@ CREDENTIAL_LEVEL_NAMES = {1: "certificate", 2: "associate", 3: "bachelors", 5: "
 
 
 def build_database(institution_records, field_of_study_records, db_path, scorecard_data_year):
+    if os.path.exists(db_path):
+        os.remove(db_path)
     conn = sqlite3.connect(db_path)
     conn.executescript(SCHEMA)
 
@@ -42,16 +45,16 @@ def build_database(institution_records, field_of_study_records, db_path, scoreca
                 sat_p25, sat_p75,
                 rec.get("latest.student.size"),
                 rec.get("latest.cost.avg_net_price.overall"),
-                rec.get("latest.cost.net_price.public.by_income_level.0-30000")
-                or rec.get("latest.cost.net_price.private.by_income_level.0-30000"),
-                rec.get("latest.cost.net_price.public.by_income_level.30001-48000")
-                or rec.get("latest.cost.net_price.private.by_income_level.30001-48000"),
-                rec.get("latest.cost.net_price.public.by_income_level.48001-75000")
-                or rec.get("latest.cost.net_price.private.by_income_level.48001-75000"),
-                rec.get("latest.cost.net_price.public.by_income_level.75001-110000")
-                or rec.get("latest.cost.net_price.private.by_income_level.75001-110000"),
-                rec.get("latest.cost.net_price.public.by_income_level.110001-plus")
-                or rec.get("latest.cost.net_price.private.by_income_level.110001-plus"),
+                _first_not_none(rec.get("latest.cost.net_price.public.by_income_level.0-30000"),
+                                rec.get("latest.cost.net_price.private.by_income_level.0-30000")),
+                _first_not_none(rec.get("latest.cost.net_price.public.by_income_level.30001-48000"),
+                                rec.get("latest.cost.net_price.private.by_income_level.30001-48000")),
+                _first_not_none(rec.get("latest.cost.net_price.public.by_income_level.48001-75000"),
+                                rec.get("latest.cost.net_price.private.by_income_level.48001-75000")),
+                _first_not_none(rec.get("latest.cost.net_price.public.by_income_level.75001-110000"),
+                                rec.get("latest.cost.net_price.private.by_income_level.75001-110000")),
+                _first_not_none(rec.get("latest.cost.net_price.public.by_income_level.110001-plus"),
+                                rec.get("latest.cost.net_price.private.by_income_level.110001-plus")),
             ),
         )
         for key, value in rec.items():
@@ -83,6 +86,13 @@ def _sum_or_none(a, b):
     if a is None or b is None:
         return None
     return int(a) + int(b)
+
+
+def _first_not_none(*values):
+    for v in values:
+        if v is not None:
+            return v
+    return None
 
 
 # College Scorecard's institution-level program_percentage.* field suffixes map
