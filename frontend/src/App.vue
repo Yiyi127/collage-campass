@@ -34,6 +34,12 @@ function handleHistorySelect(entry: HistoryEntry) {
   error.value = null
   loading.value = false
 }
+
+function handleLogoClick() {
+  result.value = null
+  error.value = null
+  submittedDescription.value = ''
+}
 </script>
 
 <template>
@@ -41,7 +47,7 @@ function handleHistorySelect(entry: HistoryEntry) {
     <!-- Always mounted: this is the SAME element that idles as the logo on
          the input view and grows/moves to center to become the loading
          indicator, driven purely by the `active` prop, not a v-if swap. -->
-    <StarLogo :active="loading" :corner="!!result" />
+    <StarLogo :active="loading" :corner="!!result" @click="handleLogoClick" />
     <HistoryPanel @select="handleHistorySelect" />
     <InputView v-if="!result && !loading" @submit="handleSubmit" />
     <LoadingStatus v-if="loading" :description="submittedDescription" />

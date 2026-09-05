@@ -5,10 +5,19 @@
 // screen and starts spinning -- it's the logo becoming the loading
 // indicator, not two different graphics swapped out.
 withDefaults(defineProps<{ active?: boolean; corner?: boolean }>(), { active: false, corner: false })
+const emit = defineEmits<{ click: [] }>()
 </script>
 
 <template>
-  <div class="star-logo" :class="{ active, corner }" role="img" aria-label="College Compass">
+  <div
+    class="star-logo"
+    :class="{ active, corner }"
+    role="button"
+    tabindex="0"
+    aria-label="College Compass — return to home"
+    @click="emit('click')"
+    @keydown.enter="emit('click')"
+  >
     <svg viewBox="0 0 120 120" class="orbit">
       <circle cx="60" cy="60" r="7" fill="var(--gold-leaf)" class="center-star" />
       <!--
@@ -41,18 +50,24 @@ withDefaults(defineProps<{ active?: boolean; corner?: boolean }>(), { active: fa
   transition: top 0.7s cubic-bezier(0.65, 0, 0.35, 1), left 0.7s cubic-bezier(0.65, 0, 0.35, 1),
     transform 0.7s cubic-bezier(0.65, 0, 0.35, 1);
   z-index: 20;
-  pointer-events: none;
+  cursor: pointer;
 }
 .star-logo.active {
   top: 40%;
   transform: translate(-50%, -50%) scale(1.35);
+  /* Mid-request there's nothing to navigate back to yet -- disable the
+     click instead of letting it abandon an in-flight generation. */
+  pointer-events: none;
+  cursor: default;
 }
 /* On the results page the logo tucks into the corner instead of hovering
-   over the title -- there's no title there for it to sit above. */
+   over the title -- there's no title there for it to sit above. Bigger
+   than the landing-page idle size since it's alone up there with no
+   title next to it, and it's now the way back home. */
 .star-logo.corner {
   left: 28px;
   top: 20px;
-  transform: scale(0.48);
+  transform: scale(0.78);
   transform-origin: top left;
 }
 .orbit {
