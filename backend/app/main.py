@@ -116,6 +116,7 @@ def generate_list(request: GenerateListRequest):
             affordability_basis=c["affordability_basis"], is_dream_school=c["is_dream_school"],
             rationale=rationales.get(c["school"]["unit_id"], ""),
             match_score=round(c["total_preference_score"] * 100),
+            distance_miles=round(c["distance_miles"]) if c["distance_miles"] is not None else None,
         )
         for c in result["colleges"]
     ]

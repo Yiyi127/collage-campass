@@ -13,6 +13,7 @@ export interface CollegeEntry {
   is_dream_school: boolean
   rationale: string
   match_score: number
+  distance_miles: number | null
 }
 
 export interface GenerateListResponse {

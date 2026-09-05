@@ -1,17 +1,58 @@
 <!-- frontend/src/views/ResultsView.vue -->
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import StarChart from '../components/StarChart.vue'
 import SchoolCard from '../components/SchoolCard.vue'
-import { downloadPdf, type GenerateListResponse } from '../api'
+import { downloadPdf, type CollegeEntry, type GenerateListResponse } from '../api'
 
 const props = defineProps<{ result: GenerateListResponse; studentName: string }>()
 
-const chartColleges = props.result.colleges.map((c, i) => ({
-  unitId: i,
-  name: c.name,
-  bucket: c.bucket,
+// The chart and each card's number badge are keyed to this ORIGINAL order
+// (Reach block, then Target, then Likely -- the order the API returns) and
+// never change, even when a section is re-sorted for display below -- the
+// number is an identifier, not a rank.
+const numbered = props.result.colleges.map((college, i) => ({ college, index: i + 1 }))
+
+const chartColleges = numbered.map(({ college, index }) => ({
+  unitId: index,
+  name: college.name,
+  bucket: college.bucket,
 }))
+
+type SortKey = 'match_score' | 'net_price' | 'distance_miles' | 'admission_rate'
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: 'match_score', label: 'Best match' },
+  { value: 'net_price', label: 'Lowest tuition' },
+  { value: 'distance_miles', label: 'Closest to home' },
+  { value: 'admission_rate', label: 'Highest admit rate' },
+]
+// Higher-is-better fields sort descending; lower-is-better sort ascending.
+// A school missing that particular data point always sorts to the end,
+// regardless of direction -- "unknown" is neither best nor worst.
+const DESCENDING: Record<SortKey, boolean> = {
+  match_score: true, admission_rate: true, net_price: false, distance_miles: false,
+}
+
+const BUCKETS = ['Reach', 'Target', 'Likely'] as const
+const sortKeys = ref<Record<(typeof BUCKETS)[number], SortKey>>({
+  Reach: 'match_score', Target: 'match_score', Likely: 'match_score',
+})
+
+function sortedSection(bucket: (typeof BUCKETS)[number]) {
+  const key = sortKeys.value[bucket]
+  const items = numbered.filter(({ college }) => college.bucket === bucket)
+  const withValue = (c: CollegeEntry) => (key === 'admission_rate' ? c.admission_rate : c[key])
+  return [...items].sort((a, b) => {
+    const av = withValue(a.college)
+    const bv = withValue(b.college)
+    if (av === null && bv === null) return 0
+    if (av === null) return 1
+    if (bv === null) return -1
+    return DESCENDING[key] ? bv - av : av - bv
+  })
+}
+
+const sections = computed(() => BUCKETS.map((bucket) => ({ bucket, items: sortedSection(bucket) })))
 
 const downloadError = ref<string | null>(null)
 
@@ -37,14 +78,25 @@ async function handleDownload() {
       <p class="legend-item"><span class="legend-dot target"></span><strong>Target</strong> — a strong, realistic match for this profile.</p>
       <p class="legend-item"><span class="legend-dot likely"></span><strong>Likely</strong> — a high probability of admission based on this profile (no school is ever guaranteed).</p>
     </section>
-    <div class="cards">
-      <SchoolCard
-        v-for="(college, i) in result.colleges"
-        :key="college.name"
-        :college="college"
-        :index="i + 1"
-      />
-    </div>
+    <section v-for="section in sections" :key="section.bucket" class="bucket-section">
+      <div v-if="section.items.length" class="bucket-header">
+        <h2 class="bucket-title" :class="section.bucket.toLowerCase()">{{ section.bucket }}</h2>
+        <label class="sort-control">
+          Sort by
+          <select v-model="sortKeys[section.bucket]">
+            <option v-for="opt in SORT_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+        </label>
+      </div>
+      <div class="cards">
+        <SchoolCard
+          v-for="{ college, index } in section.items"
+          :key="college.name"
+          :college="college"
+          :index="index"
+        />
+      </div>
+    </section>
     <section v-if="result.dream_school_exceptions.length" class="exceptions">
       <h2 class="exceptions-title">Dream Schools — Noted Exceptions</h2>
       <div
@@ -119,6 +171,42 @@ async function handleDownload() {
 .legend-dot.reach { background: var(--reach-ember); }
 .legend-dot.target { background: var(--target-sage); }
 .legend-dot.likely { background: var(--likely-teal); }
+.bucket-section {
+  margin-bottom: 1.5rem;
+}
+.bucket-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--ink-navy);
+  padding-bottom: 0.3rem;
+  margin-bottom: 0.75rem;
+}
+.bucket-title {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0;
+}
+.bucket-title.reach { color: var(--reach-ember); }
+.bucket-title.target { color: var(--target-sage); }
+.bucket-title.likely { color: var(--likely-teal); }
+.sort-control {
+  font-family: var(--font-data);
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.sort-control select {
+  font-family: var(--font-data);
+  font-size: 0.75rem;
+  background: var(--parchment);
+  color: var(--ink-navy);
+  border: 1px solid var(--ink-navy);
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+}
 .exceptions {
   margin: 2rem 0 0;
   padding: 1rem 1.25rem;

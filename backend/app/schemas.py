@@ -106,6 +106,7 @@ class CollegeEntry(BaseModel):
     is_dream_school: bool
     rationale: str
     match_score: int
+    distance_miles: Optional[float]
 
 
 class DreamSchoolExceptionEntry(BaseModel):

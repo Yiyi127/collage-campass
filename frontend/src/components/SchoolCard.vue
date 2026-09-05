@@ -23,6 +23,9 @@ defineProps<{ college: CollegeEntry; index: number }>()
       <span v-if="college.net_price !== null">
         · ${{ Math.round(college.net_price).toLocaleString() }}/yr net price
       </span>
+      <span v-if="college.distance_miles !== null">
+        · {{ college.distance_miles.toLocaleString() }} mi from home
+      </span>
       · Match score: {{ college.match_score }}/100
       <span v-if="college.confidence === 'low'" class="confidence-note">
         · (data limited)

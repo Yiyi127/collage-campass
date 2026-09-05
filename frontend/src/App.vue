@@ -3,6 +3,7 @@
 import { ref } from 'vue'
 import InputView from './views/InputView.vue'
 import ResultsView from './views/ResultsView.vue'
+import LoadingChart from './components/LoadingChart.vue'
 import { generateList, type GenerateListResponse } from './api'
 
 const result = ref<GenerateListResponse | null>(null)
@@ -25,7 +26,7 @@ async function handleSubmit(description: string) {
 <template>
   <main>
     <InputView v-if="!result && !loading" @submit="handleSubmit" />
-    <p v-if="loading" class="status">Charting the sky...</p>
+    <LoadingChart v-if="loading" />
     <p v-if="error" class="status error">{{ error }}</p>
     <ResultsView v-if="result" :result="result" student-name="Your Student" />
   </main>

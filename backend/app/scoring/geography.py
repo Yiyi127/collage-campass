@@ -49,6 +49,16 @@ def haversine_miles(state_a: str, state_b: str) -> float:
     return 2 * r * math.asin(math.sqrt(a))
 
 
+def safe_distance_miles(state_a: str | None, state_b: str | None) -> float | None:
+    """haversine_miles, but returns None instead of crashing for an unknown
+    or missing state (e.g. a US territory not in STATE_CENTROIDS) -- for
+    display purposes (e.g. an API field), where a missing distance is a
+    normal, expected case rather than an error."""
+    if not state_a or not state_b or state_a not in STATE_CENTROIDS or state_b not in STATE_CENTROIDS:
+        return None
+    return haversine_miles(state_a, state_b)
+
+
 def _near_score(miles: float) -> float:
     if miles <= 100:
         return 1.0

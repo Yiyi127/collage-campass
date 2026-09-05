@@ -1,6 +1,6 @@
 from app.db import get_eligible_schools, get_field_of_study, get_cip2_percentages
 from app.dream_schools import resolve_dream_school
-from app.scoring.geography import geography_fit
+from app.scoring.geography import geography_fit, safe_distance_miles
 from app.scoring.affordability import affordability_fit
 from app.scoring.program import program_fit
 from app.scoring.campus_size import campus_size_fit
@@ -81,6 +81,11 @@ def score_one_school(conn, school, profile, national_medians):
         "total_preference_score": total, "is_dream_school": False,
         "program_match_type": program_match_type if program_active else None,
         "affordability_basis": afford_basis if afford_active else None,
+        # Informational display field -- computed regardless of whether the
+        # student actually stated a geography preference (distance is a fact
+        # worth showing either way), and None whenever either state is
+        # unknown (e.g. a territory not in STATE_CENTROIDS).
+        "distance_miles": safe_distance_miles(profile["location"]["home_state"], school["state"]),
     }
 
 

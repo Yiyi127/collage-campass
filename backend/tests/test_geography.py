@@ -1,6 +1,6 @@
 from app.scoring.geography import (
     haversine_miles, distance_score, climate_score,
-    geography_fit, WARM_STATES, COASTAL_STATES,
+    geography_fit, safe_distance_miles, WARM_STATES, COASTAL_STATES,
 )
 
 
@@ -114,3 +114,13 @@ def test_cold_preference_averages_with_the_distance_sub_signal():
     )
     assert active is True
     assert 0.0 < score < 1.0
+
+
+def test_safe_distance_miles_matches_haversine_for_known_states():
+    assert safe_distance_miles("PA", "CA") == haversine_miles("PA", "CA")
+
+
+def test_safe_distance_miles_returns_none_for_unknown_or_missing_state():
+    assert safe_distance_miles("PA", "PR") is None
+    assert safe_distance_miles(None, "PA") is None
+    assert safe_distance_miles("PA", None) is None

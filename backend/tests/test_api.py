@@ -167,6 +167,8 @@ def test_generate_list_returns_bucketed_colleges(tmp_path, monkeypatch):
     # down to 0 or 1, making every school look identical.
     assert all(0 <= c["match_score"] <= 100 for c in body["colleges"])
     assert any(c["match_score"] > 1 for c in body["colleges"])
+    # Drexel is in PA, same as the mocked profile's home_state -> 0 miles.
+    assert drexel["distance_miles"] == 0
 
 
 def test_generate_list_handles_excluded_dream_school_without_crashing(tmp_path, monkeypatch):
@@ -225,7 +227,7 @@ def test_generate_pdf_returns_pdf_bytes():
             {"name": "Drexel University", "state": "PA", "bucket": "Target", "confidence": "high",
              "admission_rate": 0.76, "sat_p25": 1160, "sat_p75": 1380, "program_match_type": "exact",
              "net_price": 32000, "affordability_basis": None, "is_dream_school": False,
-             "rationale": "Strong co-op program fit.", "match_score": 78}
+             "rationale": "Strong co-op program fit.", "match_score": 78, "distance_miles": 12.0}
         ],
         "dream_school_exceptions": [], "relaxation_notes": [],
         "generated_at": "2026-01-01T00:00:00", "scoring_version": "v1.0", "scorecard_data_year": "test",
