@@ -69,3 +69,11 @@ def generate_pdf(response_body: GenerateListResponse):
         content=pdf_bytes, media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=college-compass-list.pdf"},
     )
+
+
+import os
+from fastapi.staticfiles import StaticFiles
+
+_frontend_dist = os.path.join(os.path.dirname(__file__), "..", "static")
+if os.path.isdir(_frontend_dist):
+    app.mount("/", StaticFiles(directory=_frontend_dist, html=True), name="static")
