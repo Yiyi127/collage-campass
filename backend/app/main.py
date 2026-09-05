@@ -1,10 +1,12 @@
 import datetime
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import Response
 from app.config import get_settings
 from app.db import get_connection
 from app.llm.client import get_client
 from app.llm.profile_extraction import extract_profile, ProfileExtractionError
 from app.llm.explanation import generate_explanations
+from app.pdf.generate import build_pdf
 from app.pipeline import run_pipeline
 from app.schemas import (
     GenerateListRequest, GenerateListResponse, CollegeEntry, DreamSchoolExceptionEntry,
@@ -57,4 +59,13 @@ def generate_list(request: GenerateListRequest):
         relaxation_notes=result["relaxation_notes"],
         generated_at=datetime.datetime.utcnow().isoformat(),
         scoring_version=SCORING_VERSION, scorecard_data_year=scorecard_year,
+    )
+
+
+@app.post("/api/generate-pdf")
+def generate_pdf(response_body: GenerateListResponse):
+    pdf_bytes = build_pdf(response_body)
+    return Response(
+        content=pdf_bytes, media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=college-compass-list.pdf"},
     )

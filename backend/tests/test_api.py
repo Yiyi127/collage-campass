@@ -147,3 +147,20 @@ def test_generate_list_returns_422_when_profile_extraction_fails(tmp_path, monke
     assert body["detail"]
     assert instance.messages.create.call_count == 2  # both extraction attempts, no explanation call
     get_settings.cache_clear()
+
+
+def test_generate_pdf_returns_pdf_bytes():
+    payload = {
+        "student_summary": "Test summary", "colleges": [
+            {"name": "Drexel University", "state": "PA", "bucket": "Target", "confidence": "high",
+             "admission_rate": 0.76, "sat_p25": 1160, "sat_p75": 1380, "program_match_type": "exact",
+             "net_price": 32000, "affordability_basis": None, "is_dream_school": False,
+             "rationale": "Strong co-op program fit."}
+        ],
+        "dream_school_exceptions": [], "relaxation_notes": [],
+        "generated_at": "2026-01-01T00:00:00", "scoring_version": "v1.0", "scorecard_data_year": "test",
+    }
+    response = client.post("/api/generate-pdf", json=payload)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.content[:4] == b"%PDF"
