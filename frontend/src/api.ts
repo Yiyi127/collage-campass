@@ -12,9 +12,11 @@ export interface CollegeEntry {
   affordability_basis: string | null
   is_dream_school: boolean
   rationale: string
+  match_score: number
 }
 
 export interface GenerateListResponse {
+  original_description: string
   student_summary: string
   colleges: CollegeEntry[]
   dream_school_exceptions: { name: string; reason: string }[]

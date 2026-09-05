@@ -1,13 +1,14 @@
 <!-- frontend/src/components/SchoolCard.vue -->
 <script setup lang="ts">
 import type { CollegeEntry } from '../api'
-defineProps<{ college: CollegeEntry }>()
+defineProps<{ college: CollegeEntry; index: number }>()
 </script>
 
 <template>
   <div class="school-card">
     <div class="header">
       <span class="name">
+        <span class="index">{{ index }}.</span>
         <span v-if="college.is_dream_school" class="dream-star" aria-hidden="true">★</span>
         {{ college.name }}
       </span>
@@ -22,6 +23,7 @@ defineProps<{ college: CollegeEntry }>()
       <span v-if="college.net_price !== null">
         · ${{ Math.round(college.net_price).toLocaleString() }}/yr net price
       </span>
+      · Match score: {{ college.match_score }}/100
       <span v-if="college.confidence === 'low'" class="confidence-note">
         · (data limited)
       </span>
@@ -60,6 +62,11 @@ defineProps<{ college: CollegeEntry }>()
 .badge.likely { background: var(--likely-teal); }
 .dream-star {
   color: var(--gold-leaf);
+}
+.index {
+  font-family: var(--font-data);
+  opacity: 0.6;
+  margin-right: 0.3rem;
 }
 .dream-label {
   font-family: var(--font-data);

@@ -105,6 +105,7 @@ class CollegeEntry(BaseModel):
     affordability_basis: Optional[str]
     is_dream_school: bool
     rationale: str
+    match_score: int
 
 
 class DreamSchoolExceptionEntry(BaseModel):
@@ -113,6 +114,7 @@ class DreamSchoolExceptionEntry(BaseModel):
 
 
 class GenerateListResponse(BaseModel):
+    original_description: str
     student_summary: str
     colleges: list[CollegeEntry]
     dream_school_exceptions: list[DreamSchoolExceptionEntry]

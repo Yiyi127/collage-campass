@@ -160,6 +160,13 @@ def test_generate_list_returns_bucketed_colleges(tmp_path, monkeypatch):
     assert all(c["rationale"] for c in body["colleges"])
     drexel = next(c for c in body["colleges"] if c["name"] == "Drexel University")
     assert drexel["rationale"] == "Drexel's co-op program fits your interest in practical, hands-on learning."
+    assert body["original_description"] == "loves programming, 1230 SAT, PA, wants to stay close to home"
+    # match_score is a 0-100 display figure; run_pipeline's internal
+    # total_preference_score is scaled 0-1, so the endpoint must multiply by
+    # 100 -- verified live that omitting this rounds every non-trivial score
+    # down to 0 or 1, making every school look identical.
+    assert all(0 <= c["match_score"] <= 100 for c in body["colleges"])
+    assert any(c["match_score"] > 1 for c in body["colleges"])
 
 
 def test_generate_list_handles_excluded_dream_school_without_crashing(tmp_path, monkeypatch):
@@ -213,11 +220,12 @@ def test_generate_list_returns_422_when_profile_extraction_fails(tmp_path, monke
 
 def test_generate_pdf_returns_pdf_bytes():
     payload = {
+        "original_description": "Loves programming, wants hands-on computing programs.",
         "student_summary": "Test summary", "colleges": [
             {"name": "Drexel University", "state": "PA", "bucket": "Target", "confidence": "high",
              "admission_rate": 0.76, "sat_p25": 1160, "sat_p75": 1380, "program_match_type": "exact",
              "net_price": 32000, "affordability_basis": None, "is_dream_school": False,
-             "rationale": "Strong co-op program fit."}
+             "rationale": "Strong co-op program fit.", "match_score": 78}
         ],
         "dream_school_exceptions": [], "relaxation_notes": [],
         "generated_at": "2026-01-01T00:00:00", "scoring_version": "v1.0", "scorecard_data_year": "test",

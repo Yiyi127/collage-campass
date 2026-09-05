@@ -10,9 +10,25 @@ SYSTEM_PROMPT = (
     "facts provided. You may use narrative context to frame why a school could personally suit the "
     "student, but never assert an unverified fact about the school itself (e.g. never claim a school "
     "'has a quiet culture' — that data does not exist). "
-    "Respond with ONLY a JSON object: "
+    "Respond with ONLY a JSON object, and nothing else: no markdown code fences, "
+    "no ```json wrapper, no leading or trailing commentary. The response must "
+    "start with '{' and end with '}': "
     '{"summary": "...", "rationales": {"<unit_id>": "...", ...}}'
 )
+
+
+def _extract_json_object(text: str) -> dict:
+    """Parse a JSON object out of `text`, tolerating the model wrapping it in
+    a markdown code fence (```json ... ``` or ``` ... ```) despite being told
+    not to -- verified live that this happens occasionally and, unhandled,
+    turns into every school silently falling back to the generic template."""
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = stripped.split("\n", 1)[1] if "\n" in stripped else ""
+        if stripped.endswith("```"):
+            stripped = stripped[: -3]
+        stripped = stripped.strip()
+    return json.loads(stripped)
 
 
 def _build_user_message(profile, colleges):
@@ -52,7 +68,7 @@ def generate_explanations(client, profile, colleges):
     locked_ids = {c["school"]["unit_id"] for c in colleges}
 
     try:
-        parsed = json.loads(text_block.text) if text_block else {}
+        parsed = _extract_json_object(text_block.text) if text_block else {}
         summary = parsed["summary"]
         rationales = {int(k): v for k, v in parsed["rationales"].items() if int(k) in locked_ids}
         for c in colleges:

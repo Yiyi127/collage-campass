@@ -46,12 +46,13 @@ def uncompressed_pdf():
 
 def _response(**overrides):
     payload = {
+        "original_description": "Loves programming, wants hands-on computing programs.",
         "student_summary": "A balanced list anchored on hands-on computing programs.",
         "colleges": [
             {"name": "Drexel University", "state": "PA", "bucket": "Target", "confidence": "high",
              "admission_rate": 0.76, "sat_p25": 1160, "sat_p75": 1380, "program_match_type": "exact",
              "net_price": 32000.0, "affordability_basis": None, "is_dream_school": False,
-             "rationale": "Strong co-op program fit."},
+             "rationale": "Strong co-op program fit.", "match_score": 78},
         ],
         "dream_school_exceptions": [], "relaxation_notes": [],
         "generated_at": "2026-01-01T00:00:00", "scoring_version": "v1.0",

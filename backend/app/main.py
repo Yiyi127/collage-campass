@@ -115,6 +115,7 @@ def generate_list(request: GenerateListRequest):
             program_match_type=c["program_match_type"], net_price=c["school"]["net_price_overall"],
             affordability_basis=c["affordability_basis"], is_dream_school=c["is_dream_school"],
             rationale=rationales.get(c["school"]["unit_id"], ""),
+            match_score=round(c["total_preference_score"] * 100),
         )
         for c in result["colleges"]
     ]
@@ -125,6 +126,7 @@ def generate_list(request: GenerateListRequest):
     scorecard_year = conn.execute("SELECT value FROM meta WHERE key = 'scorecard_data_year'").fetchone()[0]
 
     return GenerateListResponse(
+        original_description=request.description,
         student_summary=summary, colleges=colleges, dream_school_exceptions=exceptions,
         relaxation_notes=result["relaxation_notes"],
         generated_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),

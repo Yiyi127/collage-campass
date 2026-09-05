@@ -46,6 +46,23 @@ def test_generate_explanations_parses_summary_and_per_school_rationale():
     assert rationales[1] == "Drexel's co-op program fits your interest in practical, hands-on learning."
 
 
+def test_generate_explanations_tolerates_a_markdown_code_fence():
+    # Verified live: Claude occasionally wraps its JSON answer in a ```json
+    # fence despite being told not to. Unhandled, this used to fail
+    # json.loads and silently fall back to the generic template for every
+    # school on the list.
+    client = MagicMock()
+    client.messages.create.return_value = _mock_text_response(
+        '```json\n{"summary": "A solid, well-rounded list.", '
+        '"rationales": {"1": "Drexel'"'"'s co-op program fits your interest in practical, hands-on learning."}}\n```'
+    )
+
+    summary, rationales = generate_explanations(client, PROFILE, COLLEGES)
+
+    assert summary == "A solid, well-rounded list."
+    assert rationales[1] == "Drexel's co-op program fits your interest in practical, hands-on learning."
+
+
 def test_generate_explanations_falls_back_to_template_for_missing_or_malformed_output():
     client = MagicMock()
     client.messages.create.return_value = _mock_text_response("not valid json at all")
