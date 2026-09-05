@@ -36,11 +36,29 @@ def _mock_extraction_response(dream_schools=None):
     return response
 
 
-def _mock_explanation_response():
+def _mock_explanation_response(rationales=None):
     import json
     block = MagicMock()
     block.type = "text"
-    block.text = json.dumps({"summary": "A solid list.", "rationales": {}})
+    # Default rationales keyed by Drexel's unit_id (1 in the fixture DB) as a JSON
+    # string key, mirroring what the real LLM call returns -- this exercises the
+    # int(k)/locked_ids filtering path in explanation.py, not just the template
+    # fallback that kicks in when rationales is empty.
+    body = {"summary": "A solid list.",
+            "rationales": rationales if rationales is not None else
+            {"1": "Drexel's co-op program fits your interest in practical, hands-on learning."}}
+    block.text = json.dumps(body)
+    response = MagicMock()
+    response.content = [block]
+    return response
+
+
+def _mock_invalid_extraction_response():
+    # A tool_use block whose input fails StudentProfile validation, used to
+    # exercise extract_profile's retry-then-raise ProfileExtractionError path.
+    block = MagicMock()
+    block.type = "tool_use"
+    block.input = {"academics": {"gpa": "not-a-number"}}
     response = MagicMock()
     response.content = [block]
     return response
@@ -64,6 +82,11 @@ def test_generate_list_returns_bucketed_colleges(tmp_path, monkeypatch):
     assert len(body["colleges"]) > 0
     assert body["scoring_version"]
     assert body["scorecard_data_year"] == "test-fixture"
+    # Every college must have a non-empty rationale -- Drexel's (unit_id 1) comes
+    # from the real LLM-supplied branch, the rest from the template fallback.
+    assert all(c["rationale"] for c in body["colleges"])
+    drexel = next(c for c in body["colleges"] if c["name"] == "Drexel University")
+    assert drexel["rationale"] == "Drexel's co-op program fits your interest in practical, hands-on learning."
     get_settings.cache_clear()
 
 
@@ -97,4 +120,30 @@ def test_generate_list_handles_excluded_dream_school_without_crashing(tmp_path, 
     exception = body["dream_school_exceptions"][0]
     assert exception["name"] == "Unknown"
     assert "Totally Fictional University" in exception["reason"]
+    get_settings.cache_clear()
+
+
+def test_generate_list_returns_422_when_profile_extraction_fails(tmp_path, monkeypatch):
+    # extract_profile (Task 12) retries once on invalid tool_use input, then raises
+    # ProfileExtractionError. The endpoint must surface that as a clear HTTP 422,
+    # not a 500 or a hang, and must not proceed to call run_pipeline/generate_explanations.
+    db_path = os.path.join(tmp_path, "scorecard.sqlite")
+    build_fixture_db(db_path)
+    monkeypatch.setenv("SCORECARD_DB_PATH", db_path)
+    from app.config import get_settings
+    get_settings.cache_clear()
+
+    with patch("app.llm.client.anthropic.Anthropic") as MockAnthropic:
+        instance = MockAnthropic.return_value
+        instance.messages.create.side_effect = [
+            _mock_invalid_extraction_response(),
+            _mock_invalid_extraction_response(),
+        ]
+
+        response = client.post("/api/generate-list", json={"description": "garbled beyond recognition"})
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["detail"]
+    assert instance.messages.create.call_count == 2  # both extraction attempts, no explanation call
     get_settings.cache_clear()
