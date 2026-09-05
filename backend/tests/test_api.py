@@ -93,10 +93,11 @@ def test_app_startup_succeeds_with_a_populated_database(tmp_path, monkeypatch):
         assert started.get("/api/health").json()["status"] == "ok"
 
 
-def _mock_extraction_response(dream_schools=None):
+def _mock_extraction_response(dream_schools=None, name=None):
     block = MagicMock()
     block.type = "tool_use"
     block.input = {
+        "name": name,
         "academics": {"gpa": 3.5, "sat": 1230, "act": None, "ap_scores": []},
         "interests": {"raw_text": "loves programming", "cip_2digit": "11",
                       "cip_4digit_candidates": [], "importance": "preferred"},
@@ -169,6 +170,35 @@ def test_generate_list_returns_bucketed_colleges(tmp_path, monkeypatch):
     assert any(c["match_score"] > 1 for c in body["colleges"])
     # Drexel is in PA, same as the mocked profile's home_state -> 0 miles.
     assert drexel["distance_miles"] == 0
+
+
+def test_generate_list_reports_student_name_and_headline_when_name_given(tmp_path, monkeypatch):
+    _configure(tmp_path, monkeypatch)
+
+    with patch("app.llm.client.anthropic.Anthropic") as MockAnthropic:
+        instance = MockAnthropic.return_value
+        instance.messages.create.side_effect = [
+            _mock_extraction_response(name="Jordan"), _mock_explanation_response(),
+        ]
+
+        response = client.post("/api/generate-list", json={"description": "Jordan loves programming, 1230 SAT, from PA"})
+
+    body = response.json()
+    assert body["student_name"] == "Jordan"
+    assert body["profile_headline"] == "loves programming · GPA 3.5 · SAT 1230 · PA"
+
+
+def test_generate_list_reports_null_student_name_when_none_given(tmp_path, monkeypatch):
+    _configure(tmp_path, monkeypatch)
+
+    with patch("app.llm.client.anthropic.Anthropic") as MockAnthropic:
+        instance = MockAnthropic.return_value
+        instance.messages.create.side_effect = [_mock_extraction_response(), _mock_explanation_response()]
+
+        response = client.post("/api/generate-list", json={"description": "loves programming, 1230 SAT, PA"})
+
+    body = response.json()
+    assert body["student_name"] is None
 
 
 def test_generate_list_handles_excluded_dream_school_without_crashing(tmp_path, monkeypatch):

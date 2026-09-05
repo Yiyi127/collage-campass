@@ -79,6 +79,11 @@ class StudentProfile(BaseModel):
     # retry-once logic already handles correctly.
     model_config = ConfigDict(extra="forbid")
 
+    name: Optional[str] = Field(
+        None,
+        description="The student's first name or nickname, only if explicitly "
+        "stated in the description. Null if no name is mentioned.",
+    )
     academics: Academics = Field(default_factory=Academics)
     interests: Interests = Field(default_factory=Interests)
     location: Location = Field(default_factory=Location)
@@ -118,6 +123,11 @@ class DreamSchoolExceptionEntry(BaseModel):
 class GenerateListResponse(BaseModel):
     original_description: str
     student_summary: str
+    # Both default so a GenerateListResponse round-tripped from a
+    # pre-history-feature localStorage entry (missing these fields) still
+    # validates instead of failing PDF regeneration.
+    student_name: Optional[str] = None
+    profile_headline: str = ""
     colleges: list[CollegeEntry]
     dream_school_exceptions: list[DreamSchoolExceptionEntry]
     relaxation_notes: list[str]

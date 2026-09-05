@@ -20,10 +20,13 @@ SYSTEM_PROMPT = (
     "When an AP course is mentioned, record its subject; only include a score if one was "
     "explicitly stated — never invent a score just to fill the field. "
     "Do not invent facts not present in the text. "
+    "Set name only if the counselor explicitly gives the student's first name "
+    "or nickname in the text -- leave it null for a bare description with no "
+    "name (e.g. 'a junior from Ohio...'). Never invent or guess a name. "
     "Call the record_student_profile tool, setting its top-level arguments "
-    "directly to academics, interests, location, financial, campus_size, "
-    "dream_schools, and narrative_context -- do not nest them under an "
-    "additional wrapper key such as 'profile'."
+    "directly to name, academics, interests, location, financial, "
+    "campus_size, dream_schools, and narrative_context -- do not nest them "
+    "under an additional wrapper key such as 'profile'."
 )
 
 

@@ -26,6 +26,8 @@ export interface CollegeEntry {
 export interface GenerateListResponse {
   original_description: string
   student_summary: string
+  student_name: string | null
+  profile_headline: string
   colleges: CollegeEntry[]
   dream_school_exceptions: { name: string; reason: string }[]
   relaxation_notes: string[]

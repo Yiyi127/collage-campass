@@ -14,6 +14,7 @@ from app.llm.profile_extraction import extract_profile, ProfileExtractionError
 from app.llm.explanation import generate_explanations
 from app.pdf.generate import build_pdf
 from app.pipeline import run_pipeline
+from app.profile_summary import build_profile_headline
 from app.schemas import (
     GenerateListRequest, GenerateListResponse, CollegeEntry, DreamSchoolExceptionEntry,
 )
@@ -141,7 +142,10 @@ def generate_list(request: GenerateListRequest):
 
     return GenerateListResponse(
         original_description=request.description,
-        student_summary=summary, colleges=colleges, dream_school_exceptions=exceptions,
+        student_summary=summary,
+        student_name=profile.name,
+        profile_headline=build_profile_headline(profile),
+        colleges=colleges, dream_school_exceptions=exceptions,
         relaxation_notes=result["relaxation_notes"],
         generated_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         scoring_version=SCORING_VERSION, scorecard_data_year=scorecard_year,

@@ -5,7 +5,9 @@ import InputView from './views/InputView.vue'
 import ResultsView from './views/ResultsView.vue'
 import StarLogo from './components/StarLogo.vue'
 import LoadingStatus from './components/LoadingStatus.vue'
+import HistoryPanel from './components/HistoryPanel.vue'
 import { generateList, type GenerateListResponse } from './api'
+import { saveHistoryEntry, type HistoryEntry } from './history'
 
 const result = ref<GenerateListResponse | null>(null)
 const loading = ref(false)
@@ -18,11 +20,19 @@ async function handleSubmit(description: string) {
   error.value = null
   try {
     result.value = await generateList(description)
+    saveHistoryEntry(description, result.value)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Something went wrong. Please try again.'
   } finally {
     loading.value = false
   }
+}
+
+function handleHistorySelect(entry: HistoryEntry) {
+  submittedDescription.value = entry.description
+  result.value = entry.result
+  error.value = null
+  loading.value = false
 }
 </script>
 
@@ -32,10 +42,11 @@ async function handleSubmit(description: string) {
          the input view and grows/moves to center to become the loading
          indicator, driven purely by the `active` prop, not a v-if swap. -->
     <StarLogo :active="loading" :corner="!!result" />
+    <HistoryPanel @select="handleHistorySelect" />
     <InputView v-if="!result && !loading" @submit="handleSubmit" />
     <LoadingStatus v-if="loading" :description="submittedDescription" />
     <p v-if="error" class="status error">{{ error }}</p>
-    <ResultsView v-if="result" :result="result" student-name="Your Student" />
+    <ResultsView v-if="result" :result="result" :student-name="result.student_name || 'Your Student'" />
   </main>
 </template>
 
