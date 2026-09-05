@@ -13,9 +13,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./
 COPY --from=frontend-build /frontend/dist ./static
 
-ARG COLLEGE_SCORECARD_API_KEY
-ENV COLLEGE_SCORECARD_API_KEY=${COLLEGE_SCORECARD_API_KEY}
-RUN python -m scripts.refresh_data
+# Passed via BuildKit secret mount (not --build-arg) so the key never
+# appears in the command line, shell history, or the image's layer history.
+RUN --mount=type=secret,id=college_scorecard_api_key \
+    COLLEGE_SCORECARD_API_KEY="$(cat /run/secrets/college_scorecard_api_key)" python -m scripts.refresh_data
 
 ENV SCORECARD_DB_PATH=/app/scorecard.sqlite
 EXPOSE 8000

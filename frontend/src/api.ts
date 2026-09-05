@@ -1,4 +1,10 @@
 // frontend/src/api.ts
+// Empty by default so a combined deploy (backend serves this same build as
+// static files, same origin) keeps working with relative paths. Set at
+// build time for a standalone frontend deploy that calls a backend on a
+// different origin.
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
+
 export interface CollegeEntry {
   name: string
   state: string
@@ -29,7 +35,7 @@ export interface GenerateListResponse {
 }
 
 export async function generateList(description: string): Promise<GenerateListResponse> {
-  const res = await fetch('/api/generate-list', {
+  const res = await fetch(`${API_BASE}/api/generate-list`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ description }),
@@ -39,7 +45,7 @@ export async function generateList(description: string): Promise<GenerateListRes
 }
 
 export async function downloadPdf(result: GenerateListResponse): Promise<void> {
-  const res = await fetch('/api/generate-pdf', {
+  const res = await fetch(`${API_BASE}/api/generate-pdf`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(result),

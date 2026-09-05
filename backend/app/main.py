@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 import anthropic
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from app.config import get_settings, require_anthropic_api_key, ConfigurationError
 from app.db import get_connection
@@ -70,6 +71,17 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="College Compass", lifespan=lifespan)
+
+# The frontend is deployed standalone (different origin than this API), and
+# there's no cookie-based auth or per-user data here to protect -- every
+# request is a stateless description-in, list-out call. Allowing any origin
+# is the simplest correct policy for that shape.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/api/health")
